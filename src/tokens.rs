@@ -13,6 +13,9 @@ pub enum TokenKind {
     LeftBracket,    // [
     RightBracket,   // ]
 
+    LessThan,       // <
+    GreaterThan,    // >
+
     Colon,          // :
     Comma,          // ,
 

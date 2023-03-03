@@ -138,6 +138,24 @@ impl OnyxLexer {
                     ));
                     self.start += 1;
                 }
+                '<' => {
+                    self.index += 1;
+                    self.end += 1;
+                    tokens.push(Token::new(
+                        TokenKind::LessThan,
+                        Span::new(self.file_name.clone(), self.start, self.end),
+                    ));
+                    self.start += 1;
+                }
+                '>' => {
+                    self.index += 1;
+                    self.end += 1;
+                    tokens.push(Token::new(
+                        TokenKind::GreaterThan,
+                        Span::new(self.file_name.clone(), self.start, self.end),
+                    ));
+                    self.start += 1;
+                }
                 ':' => {
                     self.index += 1;
                     self.end += 1;
@@ -186,7 +204,6 @@ impl OnyxLexer {
                 }
             }
         }
-
         if errors.len() > 0 {
             return Err(errors);
         }
