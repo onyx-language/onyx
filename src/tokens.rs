@@ -17,6 +17,7 @@ pub enum TokenKind {
     GreaterThan,    // >
 
     Colon,          // :
+    Semicolon,      // ;
     Comma,          // ,
 
     Arrow,          // ->
