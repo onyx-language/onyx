@@ -1,12 +1,26 @@
 use onyx::{
+    lexer::OnyxLexer,
     error::OnyxError,
-    span::Span
+    tokens::Token,
 };
 
 fn main() {
-    let my_error: OnyxError = OnyxError::SyntaxError(
-        format!("unrecognized character '{}'", 'a'),
-        Span::new("examples/main.onyx".to_string(), 5, 7)
-    );
-    println!("{}", my_error.to_string());
+    let mut args: std::env::Args = std::env::args();
+    args.next();
+    let file_name: String = args.next().unwrap();
+
+    let mut lexer: OnyxLexer = OnyxLexer::new(file_name).unwrap();
+    let tokens: Result<Vec<Token>, Vec<OnyxError>> = lexer.lex();
+    match tokens {
+        Ok(tokens) => {
+            for token in tokens {
+                println!("{:?}", token);
+            }
+        }
+        Err(errors) => {
+            for error in errors {
+                println!("{}", error.to_string());
+            }
+        }
+    }
 }

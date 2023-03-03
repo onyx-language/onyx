@@ -1,8 +1,8 @@
 use crate::span::Span;
 use colored::*;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum OnyxError {
-    IOError(std::io::Error),
+    IOError(std::rc::Rc<std::io::Error>),
     SyntaxError(String, Span),
     TypeError(String, Span),
     ValueError(String, Span),
@@ -48,10 +48,10 @@ impl OnyxError {
     fn get_contents(&self) -> Result<String, OnyxError> {
         match std::fs::read_to_string(self.span().get_file_name()) {
             Ok(contents) => Ok(contents),
-            Err(_) => return Err(OnyxError::IOError(std::io::Error::new(
+            Err(_) => return Err(OnyxError::IOError(std::rc::Rc::new(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 format!("file '{}' not found", self.span().get_file_name())
-            ))),
+            )))),
         }
     }
     fn get_contents_of_line(&self, line: usize) -> Result<String, OnyxError> {
@@ -104,6 +104,6 @@ impl OnyxError {
 }
 impl From<std::io::Error> for OnyxError {
     fn from(error: std::io::Error) -> Self {
-        OnyxError::IOError(error)
+        OnyxError::IOError(std::rc::Rc::new(error))
     }
 }
