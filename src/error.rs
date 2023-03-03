@@ -1,4 +1,5 @@
 use crate::span::Span;
+use colored::*;
 #[derive(Debug)]
 pub enum OnyxError {
     IOError(std::io::Error),
@@ -17,12 +18,12 @@ impl OnyxError {
             _ => unreachable!(),
         }
     }
-    fn message(&self) -> String {
+    fn message(&self, show_type: bool) -> String {
         match self {
-            OnyxError::SyntaxError(msg, _) => format!("SyntaxError: {}", msg),
-            OnyxError::TypeError(msg, _) => format!("TypeError: {}", msg),
-            OnyxError::ValueError(msg, _) => format!("ValueError: {}", msg),
-            OnyxError::RuntimeError(msg, _) => format!("RuntimeError: {}", msg),
+            OnyxError::SyntaxError(msg, _) => format!("{}{}", if show_type { "SyntaxError: " } else { "" }, msg),
+            OnyxError::TypeError(msg, _) => format!("{}{}", if show_type { "TypeError: " } else { "" }, msg),
+            OnyxError::ValueError(msg, _) => format!("{}{}", if show_type { "ValueError: " } else { "" }, msg),
+            OnyxError::RuntimeError(msg, _) => format!("{}{}", if show_type { "RuntimeError: " } else { "" }, msg),
             _ => unreachable!(),
         }
     }
@@ -32,7 +33,16 @@ impl OnyxError {
             self.span().get_file_name(),
             self.get_line_number(),
             self.get_column(),
-            self.message()).as_str());
+            self.message(true)).as_str());
+        out.push_str(format!("{}{}\n", 
+            format!("{:>5} | ", self.get_line_number() - 1).bright_blue(),
+            self.get_contents_of_line(self.get_line_number()).unwrap()).as_str());
+        out.push_str(format!("{}{}\n",
+            format!("{:>5} | ", "").bright_blue(),
+            format!("{}- {}",
+                " ".repeat(self.get_column() - 1) + "^",
+                self.message(false)).red()).as_str());
+
         out
     }
     fn get_contents(&self) -> Result<String, OnyxError> {
@@ -43,6 +53,25 @@ impl OnyxError {
                 format!("file '{}' not found", self.span().get_file_name())
             ))),
         }
+    }
+    fn get_contents_of_line(&self, line: usize) -> Result<String, OnyxError> {
+        let contents = self.get_contents().unwrap();
+        let mut line_number: usize = 1;
+        let mut start: usize = 0;
+        let mut end: usize = 0;
+        for (i, c) in contents.chars().enumerate() {
+            if c == '\n' {
+                line_number += 1;
+                if line_number == line {
+                    start = i + 1;
+                }
+                if line_number == line + 1 {
+                    end = i;
+                    break;
+                }
+            }
+        }
+        Ok(contents[start..end].to_string())
     }
     fn get_line_number(&self) -> usize {
         let contents = self.get_contents().unwrap();
