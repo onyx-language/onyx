@@ -1,0 +1,4 @@
+enum Example {
+    TypedVariant(example: [u8]),
+    UntypedVariant(i32),
+}
