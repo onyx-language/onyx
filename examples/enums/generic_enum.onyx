@@ -1,0 +1,3 @@
+enum GenericEnum<T> {
+    A(t: T)
+}

@@ -1,4 +1,10 @@
-enum Example {
-    TypedVariant(example: [u8]),
-    UntypedVariant(i32),
+enum StructLikeKinda {
+    A(x: i32),
+    B(y: [u8]),
+    C(z: [char])
+}
+
+enum Untyped {
+    A,
+    B,
 }

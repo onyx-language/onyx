@@ -2,6 +2,10 @@ use onyx::{
     lexer::OnyxLexer,
     error::OnyxError,
     tokens::Token,
+    parser::{
+        Parser,
+        ParsedFirstClassStatement
+    },
 };
 
 fn main() {
@@ -13,8 +17,19 @@ fn main() {
     let tokens: Result<Vec<Token>, Vec<OnyxError>> = lexer.lex();
     match tokens {
         Ok(tokens) => {
-            for token in tokens {
-                println!("{:?}", token);
+            let mut parser: Parser = Parser::new(tokens);
+            let statements: Result<Vec<ParsedFirstClassStatement>, Vec<OnyxError>> = parser.parse();
+            match statements {
+                Ok(statements) => {
+                    for statement in statements {
+                        println!("{:?}", statement);
+                    }
+                }
+                Err(errors) => {
+                    for error in errors {
+                        println!("{}", error.to_string());
+                    }
+                }
             }
         }
         Err(errors) => {
