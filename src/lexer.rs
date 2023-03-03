@@ -144,6 +144,15 @@ impl OnyxLexer {
                         Span::new(self.file_name.clone(), self.start, self.end),
                     ));
                 }
+                ',' => {
+                    self.index += 1;
+                    self.start += 1;
+                    self.end += 1;
+                    tokens.push(Token::new(
+                        TokenKind::Comma,
+                        Span::new(self.file_name.clone(), self.start, self.end),
+                    ));
+                }
                 '-' => {
                     self.index += 1;
                     self.start += 1;

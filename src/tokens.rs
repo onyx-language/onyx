@@ -12,6 +12,7 @@ pub enum TokenKind {
     RightBracket,   // ]
 
     Colon,          // :
+    Comma,          // ,
 
     Arrow,          // ->
 }
