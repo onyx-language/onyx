@@ -75,7 +75,10 @@ impl OnyxLexer {
                         self.end += 1;
                     }
                     tokens.push(Token::new(
-                        TokenKind::Identifier(identifier),
+                        match identifier.as_str() {
+                            "enum" => TokenKind::Enum,
+                            _ => TokenKind::Identifier(identifier),
+                        },
                         Span::new(self.file_name.clone(), self.start, self.end),
                     ));
                     self.start = self.end;

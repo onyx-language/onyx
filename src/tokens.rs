@@ -4,6 +4,8 @@ pub enum TokenKind {
     Number(i64),
     Identifier(String),
 
+    Enum,           // enum
+
     LeftParen,      // (
     RightParen,     // )
     LeftBrace,      // {
