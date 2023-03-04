@@ -199,12 +199,17 @@ impl Parser {
     fn parse_statement(&mut self) -> Result<ParsedStatement, OnyxError> {
         match self.tokens[self.index].kind() {
             TokenKind::Const => self.parse_variable_declaration(true),
+            TokenKind::Var => self.parse_variable_declaration(false),
             _ => Ok(ParsedStatement::Expression(self.parse_expression()?))
         }
     }
     fn parse_variable_declaration(&mut self, mutable: bool) -> Result<ParsedStatement, OnyxError> {
         let current_token: Token = self.tokens[self.index].clone();
-        self.expect(TokenKind::Const)?;
+        if mutable {
+            self.expect(TokenKind::Var)?;
+        } else {
+            self.expect(TokenKind::Const)?;
+        }
         let name: String = self.parse_identifier()?;
         self.expect(TokenKind::Colon)?;
         let type_: ParsedType = self.parse_type()?;
