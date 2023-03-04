@@ -3,10 +3,10 @@ enum Foo {
     B,
 }
 
-// This piece of code will not work for long due to
-// a variable (in this case, constant) declarations
-// not being first-class citizens.
-// const bruh: i32 = match foo {
-//     A(a: i32) => 123,
-//     B => 456,
-// };
+function main() -> void {
+    // Still invalid for now because `foo` is undefined.
+    const bruh: i32 = match foo {
+        A(a: i32) => 123,
+        B => 456,
+    };
+}
