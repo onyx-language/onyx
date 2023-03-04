@@ -82,7 +82,9 @@ impl OnyxLexer {
                         match identifier.as_str() {
                             "const" => TokenKind::Const,
                             "enum" => TokenKind::Enum,
+                            "function" => TokenKind::Function,
                             "match" => TokenKind::Match,
+                            "named" => TokenKind::Named,
                             "raw" => TokenKind::Raw,
                             "var" => TokenKind::Var,
                             "weak" => TokenKind::Weak,

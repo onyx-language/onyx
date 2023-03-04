@@ -6,7 +6,9 @@ pub enum TokenKind {
 
     Const,          // const
     Enum,           // enum
+    Function,       // function
     Match,          // match
+    Named,          // named
     Raw,            // raw
     Var,            // var
     Weak,           // weak
