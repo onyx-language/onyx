@@ -8,6 +8,7 @@ pub enum TokenKind {
     Enum,           // enum
     Match,          // match
     Raw,            // raw
+    Var,            // var
     Weak,           // weak
 
     LeftParen,      // (

@@ -80,6 +80,7 @@ impl OnyxLexer {
                             "enum" => TokenKind::Enum,
                             "match" => TokenKind::Match,
                             "raw" => TokenKind::Raw,
+                            "var" => TokenKind::Var,
                             "weak" => TokenKind::Weak,
                             _ => TokenKind::Identifier(identifier),
                         },
