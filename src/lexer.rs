@@ -49,6 +49,7 @@ impl OnyxLexer {
                 '\n' => {
                     self.index += 1;
                     self.line += 1;
+                    self.end += 1;
                     self.start = self.end;
                 }
                 '\r' => {
@@ -63,6 +64,7 @@ impl OnyxLexer {
                         self.index += 1;
                         self.end += 1;
                     }
+                    self.start += 1;
                     tokens.push(Token::new(
                         TokenKind::Number(number.parse::<i64>().unwrap()),
                         Span::new(self.file_name.clone(), self.start, self.end),
