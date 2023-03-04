@@ -76,7 +76,10 @@ impl OnyxLexer {
                     }
                     tokens.push(Token::new(
                         match identifier.as_str() {
+                            "const" => TokenKind::Const,
                             "enum" => TokenKind::Enum,
+                            "raw" => TokenKind::Raw,
+                            "weak" => TokenKind::Weak,
                             _ => TokenKind::Identifier(identifier),
                         },
                         Span::new(self.file_name.clone(), self.start, self.end),

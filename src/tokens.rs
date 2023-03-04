@@ -4,7 +4,10 @@ pub enum TokenKind {
     Number(i64),
     Identifier(String),
 
+    Const,          // const
     Enum,           // enum
+    Raw,            // raw
+    Weak,           // weak
 
     LeftParen,      // (
     RightParen,     // )
