@@ -33,23 +33,36 @@ pub struct ParsedEnum {
 }
 
 #[derive(Debug, Clone)]
+pub struct ParsedVariableDeclaration {
+    pub name: String,
+    pub var_type: ParsedType,
+    pub initializer: Option<ParsedExpression>,
+    pub mutable: bool,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
 pub enum ParsedFirstClassStatement {
     Enum(ParsedEnum),
+    Statement(ParsedStatement), // TEMPORARY
 }
 
 #[derive(Debug, Clone)]
 pub enum ParsedStatement {
+    VariableDeclaration(ParsedVariableDeclaration),
+    Expression(ParsedExpression),
     Garbage(Span),
 }
 
 #[derive(Debug, Clone)]
 pub struct ParsedBlock {
     pub stmts: Vec<ParsedStatement>,
+    pub span: Span,
 }
 
 impl ParsedBlock {
-    pub fn new(stmts: Vec<ParsedStatement>) -> ParsedBlock {
-        ParsedBlock { stmts }
+    pub fn new(stmts: Vec<ParsedStatement>, span: Span) -> ParsedBlock {
+        ParsedBlock { stmts, span }
     }
 }
 
@@ -61,16 +74,24 @@ pub enum MatchBody {
 
 #[derive(Debug, Clone)]
 pub enum MatchCase {
-    EnumVariant {
-        variant_name: Vec<(String, Span)>,
-        variant_arguments: Vec<(Option<String>, String)>,
+    StructLike {
+        variant_name: String,
+        name_span: Span,
+        variant_arguments: Vec<(String, Option<ParsedType>)>,
         arguments_span: Span,
+        body: MatchBody,
+    },
+    Untyped {
+        variant_name: String,
+        name_span: Span,
         body: MatchBody,
     },
 }
 
 #[derive(Debug, Clone)]
 pub enum ParsedExpression {
+    Identifier(String, Span),
+    Number(i64, Span),
     Match(Box<ParsedExpression>, Vec<MatchCase>, Span),
     Garbage(Span),
 }
@@ -113,9 +134,10 @@ impl Parser {
                 self.parse_enum()
             }
             _ => {
-                let err = OnyxError::SyntaxError(format!("invalid first class statement: {:?}", self.tokens[self.index].kind()), self.tokens[self.index].span());
-                self.index += 1;
-                Err(err)
+                Ok(ParsedFirstClassStatement::Statement(self.parse_statement()?))
+                // let err = OnyxError::SyntaxError(format!("invalid first class statement: {:?}", self.tokens[self.index].kind()), self.tokens[self.index].span());
+                // self.index += 1;
+                // Err(err)
             }
         }
     }
@@ -174,8 +196,116 @@ impl Parser {
             Ok(EnumVariant::Untyped(name, self.tokens[self.index].span()))
         }
     }
+    fn parse_statement(&mut self) -> Result<ParsedStatement, OnyxError> {
+        match self.tokens[self.index].kind() {
+            TokenKind::Const => self.parse_variable_declaration(true),
+            _ => Ok(ParsedStatement::Expression(self.parse_expression()?))
+        }
+    }
+    fn parse_variable_declaration(&mut self, mutable: bool) -> Result<ParsedStatement, OnyxError> {
+        let current_token: Token = self.tokens[self.index].clone();
+        self.expect(TokenKind::Const)?;
+        let name: String = self.parse_identifier()?;
+        self.expect(TokenKind::Colon)?;
+        let type_: ParsedType = self.parse_type()?;
+        self.expect(TokenKind::Equals)?;
+        let expression: ParsedExpression = self.parse_expression()?;
+        self.expect(TokenKind::Semicolon)?;
+        Ok(ParsedStatement::VariableDeclaration(ParsedVariableDeclaration {
+            name,
+            var_type: type_,
+            initializer: Some(expression),
+            mutable,
+            span: current_token.span(),
+        }))
+    }
     fn parse_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
-        Ok(ParsedExpression::Garbage(self.tokens[self.index].span().clone()))
+        self.parse_primary_expression()
+    }
+    fn parse_primary_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
+        let current_token: Token = self.tokens[self.index].clone();
+        match current_token.kind() {
+            TokenKind::Identifier(identifier) => {
+                self.index += 1;
+                Ok(ParsedExpression::Identifier(identifier, current_token.span()))
+            }
+            TokenKind::Number(number) => {
+                self.index += 1;
+                Ok(ParsedExpression::Number(number, current_token.span()))
+            }
+            TokenKind::Match => {
+                self.expect(TokenKind::Match)?;
+                let expression: ParsedExpression = self.parse_expression()?;
+                self.expect(TokenKind::LeftBrace)?;
+                let mut cases: Vec<MatchCase> = vec![];
+                while self.tokens[self.index].kind() != TokenKind::RightBrace {
+                    cases.push(self.parse_match_case()?);
+                    if self.tokens[self.index].kind() == TokenKind::Comma {
+                        self.expect(TokenKind::Comma)?;
+                    }
+                }
+                self.expect(TokenKind::RightBrace)?;
+                Ok(ParsedExpression::Match(Box::new(expression), cases, current_token.span()))
+            }
+            _ => {
+                let err = OnyxError::SyntaxError(format!("invalid primary expression: {:?}", self.tokens[self.index].kind()), self.tokens[self.index].span());
+                self.index += 1;
+                Err(err)
+            }
+        }
+    }
+    fn parse_match_case(&mut self) -> Result<MatchCase, OnyxError> {
+        if let TokenKind::Identifier(identifier) = self.tokens[self.index].kind() {
+            let name_span: Span = self.tokens[self.index].span();
+            self.index += 1;
+            if self.tokens[self.index].kind() == TokenKind::LeftParen {
+                self.expect(TokenKind::LeftParen)?;
+                let mut variant_arguments: Vec<(String, Option<ParsedType>)> = vec![];
+                let arguments_span: Span = self.tokens[self.index].span();
+                while self.tokens[self.index].kind() != TokenKind::RightParen {
+                    let field_name: String = self.parse_identifier()?;
+                    self.expect(TokenKind::Colon)?;
+                    let field_type: ParsedType = self.parse_type()?;
+                    variant_arguments.push((field_name, Some(field_type)));
+                    if self.tokens[self.index].kind() == TokenKind::Comma {
+                        self.expect(TokenKind::Comma)?;
+                    }
+                }
+                self.expect(TokenKind::RightParen)?;
+                self.expect(TokenKind::FatArrow)?;
+                let body: MatchBody = self.parse_match_body()?;
+                Ok(MatchCase::StructLike { variant_name: identifier, name_span, variant_arguments, arguments_span, body })
+            } else {
+                self.expect(TokenKind::FatArrow)?;
+                let body: MatchBody = self.parse_match_body()?;
+                Ok(MatchCase::Untyped { variant_name: identifier, name_span, body })
+            }
+        } else {
+            let err = OnyxError::SyntaxError(format!("invalid match case: {:?}", self.tokens[self.index].kind()), self.tokens[self.index].span());
+            self.index += 1;
+            Err(err)
+        }
+    }
+    fn parse_match_body(&mut self) -> Result<MatchBody, OnyxError> {
+        let current_token: Token = self.tokens[self.index].clone();
+        match current_token.kind() {
+            TokenKind::LeftBrace => {
+                self.expect(TokenKind::LeftBrace)?;
+                let mut statements: Vec<ParsedStatement> = vec![];
+                while self.tokens[self.index].kind() != TokenKind::RightBrace {
+                    statements.push(self.parse_statement()?);
+                    if self.tokens[self.index].kind() == TokenKind::Comma {
+                        self.expect(TokenKind::Comma)?;
+                    }
+                }
+                self.expect(TokenKind::RightBrace)?;
+                Ok(MatchBody::Block(ParsedBlock::new(statements, current_token.span())))
+            }
+            _ => {
+                let expression: ParsedExpression = self.parse_expression()?;
+                Ok(MatchBody::Expression(expression))
+            }
+        }
     }
     fn parse_type(&mut self) -> Result<ParsedType, OnyxError> {
         let mut parsed_type: ParsedType = ParsedType::Empty;
