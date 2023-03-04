@@ -1,0 +1,7 @@
+class Parent<T> {
+
+}
+
+class Child<U> : Parent<U> {
+    
+}

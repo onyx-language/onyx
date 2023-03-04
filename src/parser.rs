@@ -3,6 +3,11 @@ use crate::{
     span::Span,
     error::OnyxError
 };
+#[derive(Debug, Clone, PartialEq)] pub enum Visibility {
+    Public,
+    Private,
+    Protected,
+}
 #[derive(Debug, Clone)] pub enum ParsedType {
     Name(String, Span),
     GenericType(String, Vec<ParsedType>, Span),
@@ -32,7 +37,7 @@ use crate::{
     pub mutable: bool,
     pub span: Span,
 }
-#[derive(Debug, Clone)] pub struct ParsedFunctionDeclaration {
+#[derive(Debug, Clone)] pub struct ParsedFunction {
     pub name: String,
     pub name_span: Span,
     pub generic_parameters: Vec<(String, Span)>,
@@ -47,9 +52,34 @@ use crate::{
     pub initializer: Option<ParsedExpression>,
     pub is_named: bool,
 }
+#[derive(Debug, Clone)] pub struct ParsedClass {
+    pub name: String,
+    pub name_span: Span,
+    pub generic_parameters: Vec<(String, Span)>,
+    pub parent_class: Option<String>,
+    pub parent_generic_parameters: Option<Vec<(String, Span)>>,
+    pub fields: Vec<ParsedField>,
+    pub methods: Vec<ParsedMethod>,
+}
+#[derive(Debug, Clone)] pub struct ParsedField {
+    pub base_declaration: ParsedVariableDeclaration,
+    pub visibility: Visibility,
+}
+#[derive(Debug, Clone)] pub struct ParsedMethod {
+    pub base_declaration: ParsedFunction,
+    pub visibility: Visibility,
+    pub is_virtual: bool,
+    pub is_override: bool,
+}
+impl ParsedMethod {
+    pub fn is_static(&self) -> bool {
+        self.base_declaration.parameters.clone().get(0).unwrap().name == "this"
+    }
+}
 #[derive(Debug, Clone)] pub enum ParsedFirstClassStatement {
     Enum(ParsedEnum),
-    Function(ParsedFunctionDeclaration),
+    Function(ParsedFunction),
+    Class(ParsedClass)
 }
 #[derive(Debug, Clone)] pub enum ParsedStatement {
     VariableDeclaration(ParsedVariableDeclaration),
@@ -124,6 +154,7 @@ impl Parser {
         match self.tokens[self.index].kind() {
             TokenKind::Enum => self.parse_enum(),
             TokenKind::Function => self.parse_function(),
+            TokenKind::Class => self.parse_class(),
             _ => {
                 let err = OnyxError::SyntaxError(format!("invalid first class statement: {:?}", self.tokens[self.index].kind()), self.span());
                 self.index += 1;
@@ -189,7 +220,7 @@ impl Parser {
         } else {
             self.expect(TokenKind::Semicolon)?;
         }
-        Ok(ParsedFirstClassStatement::Function(ParsedFunctionDeclaration {
+        Ok(ParsedFirstClassStatement::Function(ParsedFunction {
             name,
             name_span,
             generic_parameters,
@@ -197,6 +228,103 @@ impl Parser {
             return_type,
             body
         }))
+    }
+    fn parse_class(&mut self) -> Result<ParsedFirstClassStatement, OnyxError> {
+        self.expect(TokenKind::Class)?;
+        let name_span: Span = self.span();
+        let name: String = self.parse_identifier()?;
+        let generic_parameters: Vec<(String, Span)> = self.parse_generic_parameters()?;
+        let mut parent_class: Option<String> = None;
+        let mut parent_generic_parameters: Option<Vec<(String, Span)>> = None;
+        if self.tokens[self.index].kind() == TokenKind::Colon {
+            self.expect(TokenKind::Colon)?;
+            parent_class = Some(self.parse_identifier()?);
+            parent_generic_parameters = Some(self.parse_generic_parameters()?);
+        }
+        self.expect(TokenKind::LeftBrace)?;
+        let mut fields: Vec<ParsedField> = vec![];
+        let mut methods: Vec<ParsedMethod> = vec![];
+        while self.tokens[self.index].kind().clone() != TokenKind::RightBrace {
+            let mut visibility: Visibility = Visibility::Public;
+            if self.tokens[self.index].kind() == TokenKind::Private ||
+                self.tokens[self.index].kind() == TokenKind::Public ||
+                self.tokens[self.index].kind() == TokenKind::Protected {
+                visibility = self.parse_visibility()?;
+            }
+            match self.tokens[self.index].kind() {
+                // TODO: parse virtual and override
+                TokenKind::Function => {
+                    let base_declaration: ParsedFunction = match self.parse_function()? {
+                        ParsedFirstClassStatement::Function(function) => function,
+                        _ => {
+                            let err = OnyxError::SyntaxError(format!("expected function, but got: {:?}", self.tokens[self.index].kind()), self.span());
+                            self.index += 1;
+                            return Err(err);
+                        }
+                    };
+                    methods.push(ParsedMethod {
+                        base_declaration,
+                        visibility,
+                        is_virtual: false,
+                        is_override: false
+                    })
+                }
+                TokenKind::Var | TokenKind::Const => {
+                    let mutable: bool = self.tokens[self.index].kind() == TokenKind::Var;
+                    let base_declaration: ParsedVariableDeclaration = match self.parse_variable_declaration(mutable)? {
+                        ParsedStatement::VariableDeclaration(variable) => variable,
+                        _ => {
+                            let err = OnyxError::SyntaxError(format!("expected variable, but got: {:?}", self.tokens[self.index].kind()), self.span());
+                            self.index += 1;
+                            return Err(err);
+                        }
+                    };
+                    fields.push(ParsedField {
+                        base_declaration,
+                        visibility
+                    })
+                }
+                _ => {
+                    let err = OnyxError::SyntaxError(format!("expected function, virtual, override or var, but got: {:?}", self.tokens[self.index].kind()), self.span());
+                    self.index += 1;
+                    return Err(err);
+                }
+            }
+            if self.tokens[self.index].kind() == TokenKind::Comma {
+                self.expect(TokenKind::Comma)?;
+            }
+        }
+        self.expect(TokenKind::RightBrace)?;
+        Ok(ParsedFirstClassStatement::Class(ParsedClass {
+            name,
+            name_span,
+            generic_parameters,
+            parent_class,
+            parent_generic_parameters,
+            fields,
+            methods
+        }))
+    }
+    fn parse_visibility(&mut self) -> Result<Visibility, OnyxError> {
+        match self.tokens[self.index].kind() {
+            TokenKind::Public => {
+                self.expect(TokenKind::Public)?;
+                Ok(Visibility::Public)
+            },
+            TokenKind::Private => {
+                self.expect(TokenKind::Private)?;
+                Ok(Visibility::Private)
+            },
+            TokenKind::Protected => {
+                self.expect(TokenKind::Protected)?;
+                Ok(Visibility::Protected)
+            },
+            _ => {
+                let err = OnyxError::SyntaxError(format!("invalid visibility: {:?}", self.tokens[self.index].kind()), self.span());
+                self.index += 1;
+                Err(err)
+            }
+        }
     }
     fn parse_parameter(&mut self) -> Result<ParsedParameter, OnyxError> {
         let mut is_named: bool = false;

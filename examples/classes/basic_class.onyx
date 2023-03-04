@@ -1,0 +1,5 @@
+class Foo {
+    public var bar: i32 = 123;
+
+    private function baz() -> i32 => 123;
+}
