@@ -8,3 +8,8 @@ enum Untyped {
     A,
     B,
 }
+
+enum ThisIsHereBecauseIDontHaveVariableDeclarations<T, U> {
+    A(a: raw u8),
+    B(a: weak Untyped<T, U>),
+}

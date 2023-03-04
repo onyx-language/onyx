@@ -153,13 +153,37 @@ impl Parser {
         match current_token.kind() {
             TokenKind::Identifier(identifier) => {
                 self.index += 1;
-                parsed_type = ParsedType::Name(identifier, current_token.span());
+                if self.tokens[self.index].kind() == TokenKind::LessThan {
+                    self.expect(TokenKind::LessThan)?;
+                    let mut generic_types: Vec<ParsedType> = vec![];
+                    while self.tokens[self.index].kind() != TokenKind::GreaterThan {
+                        let ty: ParsedType = self.parse_type()?;
+                        generic_types.push(ty);
+                        if self.tokens[self.index].kind() == TokenKind::Comma {
+                            self.expect(TokenKind::Comma)?;
+                        }
+                    }
+                    self.expect(TokenKind::GreaterThan)?;
+                    parsed_type = ParsedType::GenericType(identifier, generic_types, current_token.span());
+                } else {
+                    parsed_type = ParsedType::Name(identifier, current_token.span());
+                }
             }
             TokenKind::LeftBracket => {
                 self.expect(TokenKind::LeftBracket)?;
                 let t: ParsedType = self.parse_type()?;
                 self.expect(TokenKind::RightBracket)?;
                 parsed_type = ParsedType::Array(Box::new(t), current_token.span());
+            }
+            TokenKind::Raw => {
+                self.expect(TokenKind::Raw)?;
+                let t: ParsedType = self.parse_type()?;
+                parsed_type = ParsedType::RawPtr(Box::new(t), current_token.span());
+            }
+            TokenKind::Weak => {
+                self.expect(TokenKind::Weak)?;
+                let t: ParsedType = self.parse_type()?;
+                parsed_type = ParsedType::WeakPtr(Box::new(t), current_token.span());
             }
             _ => {
                 return Err(OnyxError::SyntaxError(format!("expected type, but got {:?}", current_token.kind()), current_token.span()));
