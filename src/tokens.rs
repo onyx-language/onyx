@@ -6,6 +6,7 @@ pub enum TokenKind {
 
     Class,          // class
     Const,          // const
+    Defer,          // defer
     Enum,           // enum
     Function,       // function
     Match,          // match
