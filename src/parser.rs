@@ -308,7 +308,7 @@ impl Parser {
         }
     }
     fn parse_type(&mut self) -> Result<ParsedType, OnyxError> {
-        let mut parsed_type: ParsedType = ParsedType::Empty;
+        let parsed_type: ParsedType;
         let current_token: Token = self.tokens[self.index].clone();
         match current_token.kind() {
             TokenKind::Identifier(identifier) => {
