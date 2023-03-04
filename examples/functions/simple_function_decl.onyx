@@ -1,0 +1,5 @@
+function whatever(named x: i32) -> i32 => 123;
+
+function main(x: i32 = 123) -> T {
+    
+}
