@@ -43,7 +43,35 @@ pub enum ParsedStatement {
 }
 
 #[derive(Debug, Clone)]
+pub struct ParsedBlock {
+    pub stmts: Vec<ParsedStatement>,
+}
+
+impl ParsedBlock {
+    pub fn new(stmts: Vec<ParsedStatement>) -> ParsedBlock {
+        ParsedBlock { stmts }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum MatchBody {
+    Expression(ParsedExpression),
+    Block(ParsedBlock),
+}
+
+#[derive(Debug, Clone)]
+pub enum MatchCase {
+    EnumVariant {
+        variant_name: Vec<(String, Span)>,
+        variant_arguments: Vec<(Option<String>, String)>,
+        arguments_span: Span,
+        body: MatchBody,
+    },
+}
+
+#[derive(Debug, Clone)]
 pub enum ParsedExpression {
+    Match(Box<ParsedExpression>, Vec<MatchCase>, Span),
     Garbage(Span),
 }
 
