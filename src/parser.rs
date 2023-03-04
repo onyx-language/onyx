@@ -38,7 +38,9 @@ pub enum ParsedFirstClassStatement {
 }
 
 #[derive(Debug, Clone)]
-pub enum ParsedStatement { }
+pub enum ParsedStatement {
+    Garbage,
+}
 
 #[derive(Debug, Clone)]
 pub enum ParsedExpression {
