@@ -80,11 +80,15 @@ impl OnyxLexer {
                     }
                     tokens.push(Token::new(
                         match identifier.as_str() {
+                            "class" => TokenKind::Class,
                             "const" => TokenKind::Const,
                             "enum" => TokenKind::Enum,
                             "function" => TokenKind::Function,
                             "match" => TokenKind::Match,
                             "named" => TokenKind::Named,
+                            "private" => TokenKind::Private,
+                            "protected" => TokenKind::Protected,
+                            "public" => TokenKind::Public,
                             "raw" => TokenKind::Raw,
                             "var" => TokenKind::Var,
                             "weak" => TokenKind::Weak,

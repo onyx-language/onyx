@@ -4,11 +4,15 @@ pub enum TokenKind {
     Number(i64),
     Identifier(String),
 
+    Class,          // class
     Const,          // const
     Enum,           // enum
     Function,       // function
     Match,          // match
     Named,          // named
+    Public,         // public
+    Private,        // private
+    Protected,      // protected
     Raw,            // raw
     Var,            // var
     Weak,           // weak
