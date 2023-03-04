@@ -25,6 +25,7 @@ pub enum TokenKind {
     Comma,          // ,
 
     Arrow,          // ->
+    FatArrow,       // =>
 }
 #[derive(Clone, Debug)]
 pub struct Token { kind: TokenKind, span: Span }

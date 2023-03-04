@@ -206,6 +206,25 @@ impl OnyxLexer {
                         self.start += 1;
                     }
                 }
+                '=' => {
+                    self.index += 1;
+                    self.end += 1;
+                    if self.curr_char() == '>' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::FatArrow,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 1;
+                    } else {
+                        // tokens.push(Token::new(
+                        //     TokenKind::Equals,
+                        //     Span::new(self.file_name.clone(), self.start, self.end),
+                        // ));
+                        self.start += 1;
+                    }
+                }
                 _ => {
                     errors.push(OnyxError::SyntaxError(
                         format!("unrecognized character '{}'", self.curr_char()),
