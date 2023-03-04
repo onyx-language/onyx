@@ -1,0 +1,9 @@
+enum Foo {
+    A(a: i32),
+    B,
+}
+
+const bruh: i32 = match foo {
+    A(a: i32) => 123,
+    B => 456,
+};
