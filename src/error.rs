@@ -40,7 +40,7 @@ impl OnyxError {
         out.push_str(format!("{}{}\n",
             format!("{:>5} | ", "").bright_blue(),
             format!("{}- {}",
-                " ".repeat(self.get_column() - 1) + "^",
+                " ".repeat(self.get_column() - 1) + "^".repeat(self.span().get_end() - self.span().get_start() + 1).as_str(),
                 self.message(false)).red()).as_str());
 
         out

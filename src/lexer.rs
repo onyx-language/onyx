@@ -35,7 +35,7 @@ impl OnyxLexer {
         let binding = self.clone();
         let content = binding.content.as_ref().unwrap();
         while self.index < content.len() {
-            match self.curr_char() {
+            match self.content.as_ref().unwrap().chars().nth(self.index).unwrap() {
                 ' ' => {
                     self.index += 1;
                     self.start += 1;
@@ -46,18 +46,20 @@ impl OnyxLexer {
                     self.start += 4;
                     self.end += 4;
                 }
-                '\r' => {
-                    self.index += 1;
-                }
                 '\n' => {
                     self.index += 1;
                     self.line += 1;
                     self.start = self.end;
                 }
+                '\r' => {
+                    self.index += 1;
+                    self.start += 1;
+                    self.end += 1;
+                }
                 '0'..='9' => {
                     let mut number = String::new();
-                    while self.curr_char().is_numeric() {
-                        number.push(self.curr_char());
+                    while self.content.as_ref().unwrap().chars().nth(self.index).unwrap().is_numeric() {
+                        number.push(self.content.as_ref().unwrap().chars().nth(self.index).unwrap());
                         self.index += 1;
                         self.end += 1;
                     }
@@ -69,8 +71,8 @@ impl OnyxLexer {
                 }
                 'a'..='z' | 'A'..='Z' | '_' => {
                     let mut identifier = String::new();
-                    while self.curr_char().is_alphanumeric() || self.curr_char() == '_' {
-                        identifier.push(self.curr_char());
+                    while self.content.as_ref().unwrap().chars().nth(self.index).unwrap().is_alphanumeric() || self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '_' {
+                        identifier.push(self.content.as_ref().unwrap().chars().nth(self.index).unwrap());
                         self.index += 1;
                         self.end += 1;
                     }
@@ -88,7 +90,6 @@ impl OnyxLexer {
                     ));
                     self.start = self.end;
                 }
-                '\0' => break,
                 '(' => {
                     self.index += 1;
                     self.end += 1;
@@ -191,7 +192,7 @@ impl OnyxLexer {
                 '-' => {
                     self.index += 1;
                     self.end += 1;
-                    if self.curr_char() == '>' {
+                    if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '>' {
                         self.index += 1;
                         self.end += 1;
                         tokens.push(Token::new(
@@ -207,10 +208,31 @@ impl OnyxLexer {
                         self.start += 1;
                     }
                 }
+                '/' => {
+                    self.index += 1;
+                    self.end += 1;
+                    if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '/' {
+                        self.index += 1;
+                        self.end += 1;
+                        while self.content.as_ref().unwrap().chars().nth(self.index).unwrap() != '\n' {
+                            self.index += 1;
+                            self.end += 1;
+                        }
+                        self.index += 1;
+                        self.end += 1;
+                        self.start = self.end;
+                    } else {
+                        // tokens.push(Token::new(
+                        //     TokenKind::Slash,
+                        //     Span::new(self.file_name.clone(), self.start, self.end),
+                        // ));
+                        self.start += 1;
+                    }
+                }
                 '=' => {
                     self.index += 1;
                     self.end += 1;
-                    if self.curr_char() == '>' {
+                    if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '>' {
                         self.index += 1;
                         self.end += 1;
                         tokens.push(Token::new(
@@ -228,7 +250,7 @@ impl OnyxLexer {
                 }
                 _ => {
                     errors.push(OnyxError::SyntaxError(
-                        format!("unrecognized character '{}'", self.curr_char()),
+                        format!("unrecognized character '{}'", self.content.as_ref().unwrap().chars().nth(self.index).unwrap()),
                         Span::new(self.file_name.clone(), self.start, self.end)
                     ));
                     self.index += 1;
@@ -241,11 +263,5 @@ impl OnyxLexer {
             return Err(errors);
         }
         Ok(tokens)
-    }
-    fn curr_char(&mut self) -> char {
-        match self.content.as_ref().unwrap().chars().nth(self.index) {
-            Some(c) => c,
-            None => '\0',
-        }
     }
 }

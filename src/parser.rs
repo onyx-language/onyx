@@ -198,8 +198,8 @@ impl Parser {
     }
     fn parse_statement(&mut self) -> Result<ParsedStatement, OnyxError> {
         match self.tokens[self.index].kind() {
-            TokenKind::Const => self.parse_variable_declaration(true),
-            TokenKind::Var => self.parse_variable_declaration(false),
+            TokenKind::Const => self.parse_variable_declaration(false),
+            TokenKind::Var => self.parse_variable_declaration(true),
             _ => Ok(ParsedStatement::Expression(self.parse_expression()?))
         }
     }
