@@ -1,0 +1,6 @@
+function main() -> void {
+    defer 123;
+    defer {
+        var x: u8 = 12;
+    }
+}

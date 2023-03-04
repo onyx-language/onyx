@@ -82,9 +82,9 @@ impl ParsedMethod {
     Class(ParsedClass)
 }
 #[derive(Debug, Clone)] pub enum ParsedStatement {
-    VariableDeclaration(ParsedVariableDeclaration),
+    Defer(ParsedBody, Span),
     Expression(ParsedExpression),
-    Garbage(Span),
+    VariableDeclaration(ParsedVariableDeclaration),
 }
 #[derive(Debug, Clone)] pub struct ParsedBlock {
     pub stmts: Vec<ParsedStatement>,
@@ -387,6 +387,7 @@ impl Parser {
         match self.tokens[self.index].kind() {
             TokenKind::Const => self.parse_variable_declaration(false),
             TokenKind::Var => self.parse_variable_declaration(true),
+            TokenKind::Defer => self.parse_defer(),
             _ => Ok(ParsedStatement::Expression(self.parse_expression()?))
         }
     }
@@ -410,6 +411,29 @@ impl Parser {
             mutable,
             span: current_token.span(),
         }))
+    }
+    fn parse_defer(&mut self) -> Result<ParsedStatement, OnyxError> {
+        let span: Span = self.span();
+        self.expect(TokenKind::Defer)?;
+        let mut body: ParsedBody = ParsedBody::Empty;
+        if self.tokens[self.index].kind() == TokenKind::LeftBrace {
+            let span: Span = self.span();
+            self.expect(TokenKind::LeftBrace)?;
+            let mut statements: Vec<ParsedStatement> = vec![];
+            while self.tokens[self.index].kind() != TokenKind::RightBrace {
+                statements.push(self.parse_statement()?);
+                if self.tokens[self.index].kind() == TokenKind::Comma {
+                    self.expect(TokenKind::Comma)?;
+                }
+            }
+            self.expect(TokenKind::RightBrace)?;
+            body = ParsedBody::Block(ParsedBlock::new(statements, span))
+        } else {
+            let expression: ParsedExpression = self.parse_expression()?;
+            self.expect(TokenKind::Semicolon)?;
+            body = ParsedBody::Expression(expression);
+        }
+        Ok(ParsedStatement::Defer(body, span))
     }
     fn parse_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
         self.parse_primary_expression()
