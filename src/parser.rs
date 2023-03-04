@@ -500,7 +500,7 @@ impl Parser {
         }
     }
     fn parse_type(&mut self) -> Result<ParsedType, OnyxError> {
-        let parsed_type: ParsedType;
+        let mut parsed_type: ParsedType;
         let current_token: Token = self.tokens[self.index].clone();
         match current_token.kind() {
             TokenKind::Identifier(identifier) => {
@@ -540,6 +540,11 @@ impl Parser {
             _ => {
                 return Err(OnyxError::SyntaxError(format!("expected type, but got {:?}", current_token.kind()), current_token.span()));
             }
+        }
+        if self.tokens[self.index].kind() == TokenKind::QuestionMark {
+            let span: Span = self.span();
+            self.expect(TokenKind::QuestionMark)?;
+            parsed_type = ParsedType::Optional(Box::new(parsed_type), span);
         }
         Ok(parsed_type)
     }
