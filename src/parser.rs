@@ -39,12 +39,12 @@ pub enum ParsedFirstClassStatement {
 
 #[derive(Debug, Clone)]
 pub enum ParsedStatement {
-    Garbage,
+    Garbage(Span),
 }
 
 #[derive(Debug, Clone)]
 pub enum ParsedExpression {
-    Garbage,
+    Garbage(Span),
 }
 
 #[derive(Debug, Clone)]
@@ -147,7 +147,7 @@ impl Parser {
         }
     }
     fn parse_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
-        Ok(ParsedExpression::Garbage)
+        Ok(ParsedExpression::Garbage(self.tokens[self.index].span().clone()))
     }
     fn parse_type(&mut self) -> Result<ParsedType, OnyxError> {
         let mut parsed_type: ParsedType = ParsedType::Empty;
