@@ -44,7 +44,6 @@ pub struct ParsedVariableDeclaration {
 #[derive(Debug, Clone)]
 pub enum ParsedFirstClassStatement {
     Enum(ParsedEnum),
-    Statement(ParsedStatement), // TEMPORARY
 }
 
 #[derive(Debug, Clone)]
@@ -134,10 +133,9 @@ impl Parser {
                 self.parse_enum()
             }
             _ => {
-                Ok(ParsedFirstClassStatement::Statement(self.parse_statement()?))
-                // let err = OnyxError::SyntaxError(format!("invalid first class statement: {:?}", self.tokens[self.index].kind()), self.tokens[self.index].span());
-                // self.index += 1;
-                // Err(err)
+                let err = OnyxError::SyntaxError(format!("invalid first class statement: {:?}", self.tokens[self.index].kind()), self.tokens[self.index].span());
+                self.index += 1;
+                Err(err)
             }
         }
     }

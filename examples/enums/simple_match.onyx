@@ -6,4 +6,7 @@ enum Foo {
 // This piece of code will not work for long due to
 // a variable (in this case, constant) declarations
 // not being first-class citizens.
-const bruh: i32 = 123;
+const bruh: i32 = match foo {
+    A(a: i32) => 123,
+    B => 456,
+};
