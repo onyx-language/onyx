@@ -41,6 +41,11 @@ pub enum ParsedFirstClassStatement {
 pub enum ParsedStatement { }
 
 #[derive(Debug, Clone)]
+pub enum ParsedExpression {
+    Garbage,
+}
+
+#[derive(Debug, Clone)]
 pub struct Parser {
     pub tokens: Vec<Token>,
     pub index: usize,
@@ -138,6 +143,9 @@ impl Parser {
         } else {
             Ok(EnumVariant::Untyped(name, self.tokens[self.index].span()))
         }
+    }
+    fn parse_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
+        Ok(ParsedExpression::Garbage)
     }
     fn parse_type(&mut self) -> Result<ParsedType, OnyxError> {
         let mut parsed_type: ParsedType = ParsedType::Empty;
