@@ -218,10 +218,10 @@ impl OnyxLexer {
                         ));
                         self.start += 1;
                     } else {
-                        // tokens.push(Token::new(
-                        //     TokenKind::Equals,
-                        //     Span::new(self.file_name.clone(), self.start, self.end),
-                        // ));
+                        tokens.push(Token::new(
+                            TokenKind::Equals,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
                         self.start += 1;
                     }
                 }

@@ -17,6 +17,7 @@ pub enum TokenKind {
     LeftBracket,    // [
     RightBracket,   // ]
 
+    Equals,         // =
     LessThan,       // <
     GreaterThan,    // >
 
