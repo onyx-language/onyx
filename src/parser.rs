@@ -19,10 +19,10 @@ use crate::{
     Empty
 }
 #[derive(Debug, Clone)] pub enum EnumVariant {
-    Untyped(String, Span),          // A
-    // WithValue(String, ParsedExpression, Span), // A = 5
-    StructLike(String, Vec<(String, ParsedType)>, Span), // A(x: i32, y: i32)
-    // Typed(String, ParsedType, Span), // A: i32
+    NoValues(String, Span),                                 // A
+    // TODO: I need to figure out how to parse this but also parse the ValuesNamed.
+    ValuesNoNamed(String, Vec<ParsedType>, Span),           // A(i32, i32)
+    ValuesNamed(String, Vec<(String, ParsedType)>, Span),   // A(x: i32, y: i32)
 }
 #[derive(Debug, Clone)] pub struct ParsedEnum {
     pub name: String,
@@ -118,6 +118,7 @@ impl ParsedBlock {
     Identifier(String, Span),
     Number(i64, Span),
     Match(Box<ParsedExpression>, Vec<MatchCase>, Span),
+    MemberAccess(Box<ParsedExpression>, Box<ParsedExpression>, Span),
     Garbage(Span),
 }
 #[derive(Debug, Clone)] pub struct Parser {
@@ -378,9 +379,9 @@ impl Parser {
                 }
             }
             self.expect(TokenKind::RightParen)?;
-            Ok(EnumVariant::StructLike(name, fields, self.span()))
+            Ok(EnumVariant::ValuesNamed(name, fields, self.span()))
         } else {
-            Ok(EnumVariant::Untyped(name, self.span()))
+            Ok(EnumVariant::NoValues(name, self.span()))
         }
     }
     fn parse_statement(&mut self) -> Result<ParsedStatement, OnyxError> {
@@ -401,13 +402,16 @@ impl Parser {
         let name: String = self.parse_identifier()?;
         self.expect(TokenKind::Colon)?;
         let type_: ParsedType = self.parse_type()?;
-        self.expect(TokenKind::Equals)?;
-        let expression: ParsedExpression = self.parse_expression()?;
+        let mut expression: Option<ParsedExpression> = None;
+        if self.tokens[self.index].kind() == TokenKind::Equals {
+            self.expect(TokenKind::Equals)?;
+            expression = Some(self.parse_expression()?);
+        }
         self.expect(TokenKind::Semicolon)?;
         Ok(ParsedStatement::VariableDeclaration(ParsedVariableDeclaration {
             name,
             var_type: type_,
-            initializer: Some(expression),
+            initializer: expression,
             mutable,
             span: current_token.span(),
         }))
@@ -436,7 +440,21 @@ impl Parser {
         Ok(ParsedStatement::Defer(body, span))
     }
     fn parse_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
-        self.parse_primary_expression()
+        self.parse_postfix_expression()
+    }
+    fn parse_postfix_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
+        let span: Span = self.span();
+        let mut expression: ParsedExpression = self.parse_primary_expression()?;
+        loop {
+            match self.tokens[self.index].kind() {
+                TokenKind::Dot => {
+                    self.index += 1;
+                    expression = ParsedExpression::MemberAccess(Box::new(expression), Box::new(self.parse_expression()?), span.clone());
+                }
+                _ => break,
+            }
+        }
+        Ok(expression)
     }
     fn parse_primary_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
         let current_token: Token = self.tokens[self.index].clone();

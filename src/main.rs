@@ -22,7 +22,7 @@ fn main() {
             match statements {
                 Ok(statements) => {
                     for statement in statements {
-                        println!("{:?}", statement);
+                        println!("{:#?}", statement);
                     }
                 }
                 Err(errors) => {
