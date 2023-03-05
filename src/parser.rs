@@ -252,6 +252,15 @@ impl Parser {
                 self.tokens[self.index].kind() == TokenKind::Protected {
                 visibility = self.parse_visibility()?;
             }
+            let mut is_override: bool = false;
+            let mut is_virtual: bool = false;
+            if self.tokens[self.index].kind() == TokenKind::Override {
+                self.expect(TokenKind::Override)?;
+                is_override = true;
+            } else if self.tokens[self.index].kind() == TokenKind::Virtual {
+                self.expect(TokenKind::Virtual)?;
+                is_virtual = false;
+            }
             match self.tokens[self.index].kind() {
                 // TODO: parse virtual and override
                 TokenKind::Function => {
@@ -266,8 +275,8 @@ impl Parser {
                     methods.push(ParsedMethod {
                         base_declaration,
                         visibility,
-                        is_virtual: false,
-                        is_override: false
+                        is_virtual,
+                        is_override
                     })
                 }
                 TokenKind::Var | TokenKind::Const => {
