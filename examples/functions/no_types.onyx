@@ -1,15 +1,17 @@
 class Foo {
-    public function foo(this, named x);
+    public function foo(this, named x: u8);
     public function static_function();
 }
 
 
 function foo() -> i64 => 123;
 
+function no_body();
+
 function bar() -> [raw char] {
     return 123;
 }
 
-// function main() -> i32 {
-//     return 123;
-// }
+function main() -> i32 {
+    return 123;
+}

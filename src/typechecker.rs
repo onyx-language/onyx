@@ -143,7 +143,7 @@ impl Typechecker {
             match statement {
                 ParsedFirstClassStatement::Function(function) => {
                     self.current_function = Some(function.clone());
-                    let mut return_type: CheckedType;
+                    let return_type: CheckedType;
                     if function.name.clone() == "main" {
                         return_type = CheckedType::I32(function.return_type.clone().span());
                     } else if let ParsedType::Empty(span) = function.return_type.clone() {
@@ -173,7 +173,9 @@ impl Typechecker {
                                     }
                                 }
                             }
-                            ParsedBody::Empty => {}
+                            ParsedBody::Empty => {
+                                errors.push(OnyxError::TypeErrorWithHint("cannot infer return type of function".to_string(), span.clone(), "try adding a return type or function body".to_string(), span.clone()));
+                            }
                         }
                         if let Some(type_) = type_ {
                             return_type = type_;
@@ -182,6 +184,7 @@ impl Typechecker {
                         }
                     } else {
                         return_type = self.typecheck_type(&function.return_type);
+                        let span = function.return_type.clone().span();
                         let body: ParsedBody = function.body.clone();
                         match body {
                             ParsedBody::Expression(expression) => match expression {
@@ -219,7 +222,9 @@ impl Typechecker {
                                     }
                                 }
                             }
-                            ParsedBody::Empty => {}
+                            ParsedBody::Empty => {
+                                errors.push(OnyxError::TypeErrorWithHint("cannot infer return type of function".to_string(), span.clone(), "try adding a return type or function body".to_string(), span.clone()));
+                            }
                         }
                     }
                     self.current_function = None;
@@ -240,7 +245,88 @@ impl Typechecker {
 
                     let mut methods: Vec<CheckedMethod> = vec![];
                     for method in class.methods.clone() {
-                        let mut return_type: CheckedType;
+                        let return_type: CheckedType;
+                        if let ParsedType::Empty(span) = method.base_declaration.return_type.clone() {
+                            let body: ParsedBody = method.base_declaration.body.clone();
+                            let mut type_: Option<CheckedType> = None;
+                            match body {
+                                ParsedBody::Expression(expression) => match expression {
+                                    ParsedExpression::Number(number, span) => type_ = Some(self.get_checked_type_from_i64(number, span)),
+                                    _ => {}
+                                }
+                                ParsedBody::Block(block) => {
+                                    for statement in block.stmts {
+                                        match statement.clone() {
+                                            ParsedStatement::Return(expression, span) => {
+                                                if expression.is_none() {
+                                                    type_ = Some(CheckedType::Void(span));
+                                                    break;
+                                                } else {
+                                                    match expression.unwrap() {
+                                                        ParsedExpression::Number(number, span) => type_ = Some(self.get_checked_type_from_i64(number, span)),
+                                                        _ => {}
+                                                    }
+                                                    break;
+                                                }
+                                            }
+                                            _ => todo!("typecheck function body")
+                                        }
+                                    }
+                                }
+                                ParsedBody::Empty => {
+                                    errors.push(OnyxError::TypeErrorWithHint("cannot infer return type of method".to_string(), method.base_declaration.return_type.clone().span(), "try adding a return type or method body".to_string(), method.base_declaration.return_type.clone().span()));
+                                }
+                            }
+                            if let Some(type_) = type_ {
+                                return_type = type_;
+                            } else {
+                                return_type = CheckedType::Void(method.base_declaration.return_type.clone().span())
+                            }
+                        } else {
+                            return_type = self.typecheck_type(&method.base_declaration.return_type);
+                            let body: ParsedBody = method.base_declaration.body.clone();
+                            match body {
+                                ParsedBody::Expression(expression) => match expression {
+                                    ParsedExpression::Number(number, span) => {
+                                        let type_: CheckedType = self.get_checked_type_from_i64(number, span.clone());
+                                        if let Err(err) = self.test_types(type_.clone(), return_type.clone()) {
+                                            errors.push(err);
+                                        }
+                                    },
+                                    _ => {}
+                                }
+                                ParsedBody::Block(block) => {
+                                    for statement in block.stmts {
+                                        match statement.clone() {
+                                            ParsedStatement::Return(expression, span) => {
+                                                if expression.is_none() {
+                                                    if let CheckedType::Void(_) = return_type {
+                                                        continue;
+                                                    } else {
+                                                        errors.push(OnyxError::TypeError(format!("type {} is not void", return_type.name()), span.clone()));
+                                                    }
+                                                } else {
+                                                    match expression.unwrap() {
+                                                        ParsedExpression::Number(number, span) => {
+                                                            let type_: CheckedType = self.get_checked_type_from_i64(number, span.clone());
+                                                            if let Err(err) = self.test_types(type_.clone(), return_type.clone()) {
+                                                                errors.push(err);
+                                                            }
+                                                        },
+                                                        _ => {}
+                                                    }
+                                                }
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                                ParsedBody::Empty => {
+                                    errors.push(OnyxError::TypeErrorWithHint("cannot infer return type of method".to_string(), method.base_declaration.return_type.clone().span(), "try adding a return type or method body".to_string(), method.base_declaration.return_type.clone().span()));
+                                }
+                            }
+                        }
+
                         let mut parameters: Vec<CheckedParameter> = vec![];
                         let mut is_static: bool = true;
                         for parameter in method.base_declaration.parameters.clone() {
@@ -293,7 +379,7 @@ impl Typechecker {
                             base_declaration: CheckedFunction {
                                 name: method.base_declaration.name.clone(),
                                 parameters,
-                                return_type: self.typecheck_type(&method.base_declaration.return_type),
+                                return_type,
                                 body: vec![]
                             },
                             visibility: method.visibility,
