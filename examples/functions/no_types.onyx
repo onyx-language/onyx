@@ -1,6 +1,8 @@
 class Foo {
     public function foo(this, named x);
+    public function static_function();
 }
+
 
 function foo() -> i64 => 123;
 
@@ -8,6 +10,6 @@ function bar() -> [raw char] {
     return 123;
 }
 
-function main() -> i32 {
-    return 123;
-}
+// function main() -> i32 {
+//     return 123;
+// }

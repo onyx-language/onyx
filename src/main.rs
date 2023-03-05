@@ -22,7 +22,7 @@ fn main() {
                     for statement in &ast.statements {
                         println!("{:?}", statement);
                     }
-                    let typechecker: Typechecker = Typechecker::new(ast);
+                    let mut typechecker: Typechecker = Typechecker::new(ast);
                     let checked_ast: Result<CheckedAST, Vec<OnyxError>> = typechecker.typecheck();
                     match checked_ast {
                         Ok(checked_ast) => {
