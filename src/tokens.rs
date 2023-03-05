@@ -16,6 +16,7 @@ pub enum TokenKind {
     Private,        // private
     Protected,      // protected
     Raw,            // raw
+    Return,         // return
     Var,            // var
     Virtual,        // virtual
     Weak,           // weak
