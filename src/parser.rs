@@ -11,7 +11,7 @@ use crate::{
 #[derive(Debug, Clone)] pub struct ParsedAST {
     pub statements: Vec<ParsedFirstClassStatement>,
 }
-#[derive(Debug, Clone)] pub enum ParsedType {
+#[derive(Debug, Clone, PartialEq)] pub enum ParsedType {
     Name(String, Span),
     GenericType(String, Vec<ParsedType>, Span),
     Array(Box<ParsedType>, Span),
@@ -19,7 +19,21 @@ use crate::{
     Optional(Box<ParsedType>, Span),
     RawPtr(Box<ParsedType>, Span),
     WeakPtr(Box<ParsedType>, Span),
-    Empty
+    Empty(Span)
+}
+impl ParsedType {
+    pub fn span(&self) -> Span {
+        match self {
+            ParsedType::Name(_, span) => span.clone(),
+            ParsedType::GenericType(_, _, span) => span.clone(),
+            ParsedType::Array(_, span) => span.clone(),
+            ParsedType::SizedArray(_, _, span) => span.clone(),
+            ParsedType::Optional(_, span) => span.clone(),
+            ParsedType::RawPtr(_, span) => span.clone(),
+            ParsedType::WeakPtr(_, span) => span.clone(),
+            ParsedType::Empty(span) => span.clone(),
+        }
+    }
 }
 #[derive(Debug, Clone)] pub enum EnumVariant {
     NoValues(String, Span),                                 // A
@@ -87,6 +101,7 @@ impl ParsedMethod {
 #[derive(Debug, Clone)] pub enum ParsedStatement {
     Defer(ParsedBody, Span),
     Expression(ParsedExpression),
+    Return(Option<ParsedExpression>, Span),
     VariableDeclaration(ParsedVariableDeclaration),
 }
 #[derive(Debug, Clone)] pub struct ParsedBlock {
@@ -198,13 +213,17 @@ impl Parser {
             if self.tokens[self.index].kind() == TokenKind::Identifier("this".to_string()) {
                 let name_span: Span = self.span();
                 self.expect(TokenKind::Identifier("this".to_string()))?;
+                let type_span: Span = self.span();
                 parameters.push(ParsedParameter {
                     name: "this".to_string(),
                     name_span,
-                    parameter_type: ParsedType::Empty,
+                    parameter_type: ParsedType::Empty(type_span),
                     initializer: None,
                     is_named: false,
                 });
+                if self.tokens[self.index].kind() == TokenKind::Comma {
+                    self.expect(TokenKind::Comma)?;
+                }
                 continue;
             }
             parameters.push(self.parse_parameter()?);
@@ -213,7 +232,7 @@ impl Parser {
             }
         }
         self.expect(TokenKind::RightParen)?;
-        let mut return_type: ParsedType = ParsedType::Empty;
+        let mut return_type: ParsedType = ParsedType::Empty(self.span());
         if self.tokens[self.index].kind() == TokenKind::Arrow {
             self.expect(TokenKind::Arrow)?;
             return_type = self.parse_type()?;
@@ -362,7 +381,7 @@ impl Parser {
         }
         let name_span: Span = self.tokens[self.index].span();
         let name: String = self.parse_identifier()?;
-        let mut parameter_type: ParsedType = ParsedType::Empty;
+        let mut parameter_type: ParsedType = ParsedType::Empty(name_span.clone());
         if self.tokens[self.index].kind() == TokenKind::Colon {
             self.expect(TokenKind::Colon)?;
             parameter_type = self.parse_type()?;
@@ -418,6 +437,7 @@ impl Parser {
         match self.tokens[self.index].kind() {
             TokenKind::Const => self.parse_variable_declaration(false),
             TokenKind::Var => self.parse_variable_declaration(true),
+            TokenKind::Return => self.parse_return(),
             TokenKind::Defer => self.parse_defer(),
             _ => {
                 let expression: ParsedExpression = self.parse_expression()?;
@@ -434,7 +454,7 @@ impl Parser {
             self.expect(TokenKind::Const)?;
         }
         let name: String = self.parse_identifier()?;
-        let mut var_type: ParsedType = ParsedType::Empty;
+        let mut var_type: ParsedType = ParsedType::Empty(self.span());
         if self.tokens[self.index].kind() == TokenKind::Colon {
             self.expect(TokenKind::Colon)?;
             var_type = self.parse_type()?;
@@ -452,6 +472,16 @@ impl Parser {
             mutable,
             span: current_token.span(),
         }))
+    }
+    fn parse_return(&mut self) -> Result<ParsedStatement, OnyxError> {
+        let span: Span = self.span();
+        self.expect(TokenKind::Return)?;
+        let mut expression: Option<ParsedExpression> = None;
+        if self.tokens[self.index].kind() != TokenKind::Semicolon {
+            expression = Some(self.parse_expression()?);
+        }
+        self.expect(TokenKind::Semicolon)?;
+        Ok(ParsedStatement::Return(expression, span))
     }
     fn parse_defer(&mut self) -> Result<ParsedStatement, OnyxError> {
         let span: Span = self.span();
