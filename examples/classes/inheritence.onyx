@@ -1,7 +1,7 @@
 class Parent {
-    public virtual function foo(this: Parent) -> i32 => 123;
+    public virtual function foo(this) -> i32 => 123;
 }
 
 class Child : Parent {
-    public override function foo(this: Child) -> i32 => 456;
+    public override function foo(this) -> i32 => 456;
 }

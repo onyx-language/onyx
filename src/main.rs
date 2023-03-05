@@ -2,10 +2,8 @@ use onyx::{
     lexer::OnyxLexer,
     error::OnyxError,
     tokens::Token,
-    parser::{
-        Parser,
-        ParsedFirstClassStatement
-    },
+    parser::{ Parser, ParsedAST },
+    typechecker::{ Typechecker, CheckedAST },
 };
 
 fn main() {
@@ -18,11 +16,23 @@ fn main() {
     match tokens {
         Ok(tokens) => {
             let mut parser: Parser = Parser::new(tokens);
-            let statements: Result<Vec<ParsedFirstClassStatement>, Vec<OnyxError>> = parser.parse();
-            match statements {
-                Ok(statements) => {
-                    for statement in statements {
-                        println!("{:#?}", statement);
+            let ast: Result<ParsedAST, Vec<OnyxError>> = parser.parse();
+            match ast {
+                Ok(ast) => {
+                    for statement in &ast.statements {
+                        println!("{:?}", statement);
+                    }
+                    let typechecker: Typechecker = Typechecker::new(ast);
+                    let checked_ast: Result<CheckedAST, Vec<OnyxError>> = typechecker.typecheck();
+                    match checked_ast {
+                        Ok(checked_ast) => {
+                            println!("{:?}", checked_ast);
+                        }
+                        Err(errors) => {
+                            for error in errors {
+                                println!("{}", error.to_string());
+                            }
+                        }
                     }
                 }
                 Err(errors) => {

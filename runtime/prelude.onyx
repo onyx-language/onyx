@@ -10,5 +10,5 @@ class String {
         this.data = data;
         this.length = length.size;
     }
-    public function length(this: String) -> usize => this.length;
+    public function length(this) -> usize => this.length;
 }

@@ -8,6 +8,9 @@ use crate::{
     Private,
     Protected,
 }
+#[derive(Debug, Clone)] pub struct ParsedAST {
+    pub statements: Vec<ParsedFirstClassStatement>,
+}
 #[derive(Debug, Clone)] pub enum ParsedType {
     Name(String, Span),
     GenericType(String, Vec<ParsedType>, Span),
@@ -134,7 +137,7 @@ impl Parser {
             errors: vec![],
         }
     }
-    pub fn parse(&mut self) -> Result<Vec<ParsedFirstClassStatement>, Vec<OnyxError>> {
+    pub fn parse(&mut self) -> Result<ParsedAST, Vec<OnyxError>> {
         let mut statements: Vec<ParsedFirstClassStatement> = vec![];
         while self.index < self.tokens.len() {
             statements.push(match self.parse_first_class_statement() {
@@ -148,7 +151,7 @@ impl Parser {
         if self.errors.len() > 0 {
             Err(self.errors.clone())
         } else {
-            Ok(statements)
+            Ok(ParsedAST { statements })
         }
     }
     fn parse_first_class_statement(&mut self) -> Result<ParsedFirstClassStatement, OnyxError> {
@@ -192,14 +195,29 @@ impl Parser {
         self.expect(TokenKind::LeftParen)?;
         let mut parameters: Vec<ParsedParameter> = vec![];
         while self.tokens[self.index].kind() != TokenKind::RightParen {
+            if self.tokens[self.index].kind() == TokenKind::Identifier("this".to_string()) {
+                let name_span: Span = self.span();
+                self.expect(TokenKind::Identifier("this".to_string()))?;
+                parameters.push(ParsedParameter {
+                    name: "this".to_string(),
+                    name_span,
+                    parameter_type: ParsedType::Empty,
+                    initializer: None,
+                    is_named: false,
+                });
+                continue;
+            }
             parameters.push(self.parse_parameter()?);
             if self.tokens[self.index].kind() == TokenKind::Comma {
                 self.expect(TokenKind::Comma)?;
             }
         }
         self.expect(TokenKind::RightParen)?;
-        self.expect(TokenKind::Arrow)?;
-        let return_type: ParsedType = self.parse_type()?;
+        let mut return_type: ParsedType = ParsedType::Empty;
+        if self.tokens[self.index].kind() == TokenKind::Arrow {
+            self.expect(TokenKind::Arrow)?;
+            return_type = self.parse_type()?;
+        }
         let mut body: ParsedBody = ParsedBody::Empty;
         if self.tokens[self.index].kind() == TokenKind::FatArrow {
             self.expect(TokenKind::FatArrow)?;
@@ -344,8 +362,11 @@ impl Parser {
         }
         let name_span: Span = self.tokens[self.index].span();
         let name: String = self.parse_identifier()?;
-        self.expect(TokenKind::Colon)?;
-        let parameter_type: ParsedType = self.parse_type()?;
+        let mut parameter_type: ParsedType = ParsedType::Empty;
+        if self.tokens[self.index].kind() == TokenKind::Colon {
+            self.expect(TokenKind::Colon)?;
+            parameter_type = self.parse_type()?;
+        }
         let mut initializer: Option<ParsedExpression> = None;
         if self.tokens[self.index].kind() == TokenKind::Equals {
             self.expect(TokenKind::Equals)?;
@@ -413,8 +434,11 @@ impl Parser {
             self.expect(TokenKind::Const)?;
         }
         let name: String = self.parse_identifier()?;
-        self.expect(TokenKind::Colon)?;
-        let type_: ParsedType = self.parse_type()?;
+        let mut var_type: ParsedType = ParsedType::Empty;
+        if self.tokens[self.index].kind() == TokenKind::Colon {
+            self.expect(TokenKind::Colon)?;
+            var_type = self.parse_type()?;
+        }
         let mut expression: Option<ParsedExpression> = None;
         if self.tokens[self.index].kind() == TokenKind::Equals {
             self.expect(TokenKind::Equals)?;
@@ -423,7 +447,7 @@ impl Parser {
         self.expect(TokenKind::Semicolon)?;
         Ok(ParsedStatement::VariableDeclaration(ParsedVariableDeclaration {
             name,
-            var_type: type_,
+            var_type,
             initializer: expression,
             mutable,
             span: current_token.span(),
