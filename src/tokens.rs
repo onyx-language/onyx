@@ -31,6 +31,7 @@ pub enum TokenKind {
 
     Colon,          // :
     Semicolon,      // ;
+    Dot,            // .
     Comma,          // ,
     QuestionMark,   // ?
 

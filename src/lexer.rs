@@ -189,6 +189,15 @@ impl OnyxLexer {
                     ));
                     self.start += 1;
                 }
+                '.' => {
+                    self.index += 1;
+                    self.end += 1;
+                    tokens.push(Token::new(
+                        TokenKind::Dot,
+                        Span::new(self.file_name.clone(), self.start, self.end),
+                    ));
+                    self.start += 1;
+                }
                 ',' => {
                     self.index += 1;
                     self.end += 1;

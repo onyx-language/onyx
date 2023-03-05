@@ -1,15 +1,9 @@
-enum StructLikeKinda {
-    A(x: i32),
-    B(y: [u8]),
-    C(z: [char])
-}
-
-enum Untyped {
+enum NoValues {
     A,
     B,
 }
 
-enum ThisIsHereBecauseIDontHaveVariableDeclarations<T, U> {
-    A(a: raw u8),
-    B(a: weak Untyped<T, U>),
+enum ValuesNamed {
+    A(x: i32),
+    B(y: [u8]),
 }

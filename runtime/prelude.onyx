@@ -2,3 +2,10 @@ enum Result<R, E> {
     Ok(r: R),
     Err(e: E),
 }
+
+class String {
+    private var data: [u8];
+    private var length: usize;
+    public function create(data: [u8]) -> String { }
+    public function length(this: String) -> usize => this.length;
+}
