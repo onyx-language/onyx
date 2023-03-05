@@ -6,6 +6,9 @@ enum Result<R, E> {
 class String {
     private var data: [u8];
     private var length: usize;
-    public function create(data: [u8]) -> String { }
+    public function create(data: [u8]) -> String {
+        this.data = data;
+        this.length = length.size;
+    }
     public function length(this: String) -> usize => this.length;
 }

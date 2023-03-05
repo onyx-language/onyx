@@ -115,11 +115,11 @@ impl ParsedBlock {
     },
 }
 #[derive(Debug, Clone)] pub enum ParsedExpression {
+    Assignment(Box<ParsedExpression>, Box<ParsedExpression>, Span),
     Identifier(String, Span),
-    Number(i64, Span),
     Match(Box<ParsedExpression>, Vec<MatchCase>, Span),
     MemberAccess(Box<ParsedExpression>, Box<ParsedExpression>, Span),
-    Garbage(Span),
+    Number(i64, Span),
 }
 #[derive(Debug, Clone)] pub struct Parser {
     pub tokens: Vec<Token>,
@@ -398,7 +398,11 @@ impl Parser {
             TokenKind::Const => self.parse_variable_declaration(false),
             TokenKind::Var => self.parse_variable_declaration(true),
             TokenKind::Defer => self.parse_defer(),
-            _ => Ok(ParsedStatement::Expression(self.parse_expression()?))
+            _ => {
+                let expression: ParsedExpression = self.parse_expression()?;
+                self.expect(TokenKind::Semicolon)?;
+                Ok(ParsedStatement::Expression(expression))
+            }
         }
     }
     fn parse_variable_declaration(&mut self, mutable: bool) -> Result<ParsedStatement, OnyxError> {
@@ -428,7 +432,7 @@ impl Parser {
     fn parse_defer(&mut self) -> Result<ParsedStatement, OnyxError> {
         let span: Span = self.span();
         self.expect(TokenKind::Defer)?;
-        let mut body: ParsedBody = ParsedBody::Empty;
+        let body: ParsedBody;
         if self.tokens[self.index].kind() == TokenKind::LeftBrace {
             let span: Span = self.span();
             self.expect(TokenKind::LeftBrace)?;
@@ -449,7 +453,21 @@ impl Parser {
         Ok(ParsedStatement::Defer(body, span))
     }
     fn parse_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
-        self.parse_postfix_expression()
+        self.parse_assignment_expression()
+    }
+    fn parse_assignment_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
+        let span: Span = self.span();
+        let mut expression: ParsedExpression = self.parse_postfix_expression()?;
+        loop {
+            match self.tokens[self.index].kind() {
+                TokenKind::Equals => {
+                    self.index += 1;
+                    expression = ParsedExpression::Assignment(Box::new(expression), Box::new(self.parse_expression()?), span.clone());
+                }
+                _ => break,
+            }
+        }
+        Ok(expression)
     }
     fn parse_postfix_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
         let span: Span = self.span();
