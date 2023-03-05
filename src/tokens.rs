@@ -11,11 +11,13 @@ pub enum TokenKind {
     Function,       // function
     Match,          // match
     Named,          // named
+    Override,       // override
     Public,         // public
     Private,        // private
     Protected,      // protected
     Raw,            // raw
     Var,            // var
+    Virtual,        // virtual
     Weak,           // weak
 
     LeftParen,      // (
