@@ -5,6 +5,7 @@ pub enum OnyxError {
     IOError(std::rc::Rc<std::io::Error>),
     SyntaxError(String, Span),
     TypeError(String, Span),
+    TypeErrorWithHint(String, Span, String, Span),
     ValueError(String, Span),
     RuntimeError(String, Span),
 }
@@ -13,6 +14,7 @@ impl OnyxError {
         match self {
             OnyxError::SyntaxError(_, s) => s.clone(),
             OnyxError::TypeError(_, s) => s.clone(),
+            OnyxError::TypeErrorWithHint(_, s, _, _) => s.clone(),
             OnyxError::ValueError(_, s) => s.clone(),
             OnyxError::RuntimeError(_, s) => s.clone(),
             _ => unreachable!(),
@@ -22,6 +24,7 @@ impl OnyxError {
         match self {
             OnyxError::SyntaxError(msg, _) => format!("{}{}", if show_type { "SyntaxError: " } else { "" }, msg),
             OnyxError::TypeError(msg, _) => format!("{}{}", if show_type { "TypeError: " } else { "" }, msg),
+            OnyxError::TypeErrorWithHint(msg, _, _, _) => format!("{}{}", if show_type { "TypeError: " } else { "" }, msg),
             OnyxError::ValueError(msg, _) => format!("{}{}", if show_type { "ValueError: " } else { "" }, msg),
             OnyxError::RuntimeError(msg, _) => format!("{}{}", if show_type { "RuntimeError: " } else { "" }, msg),
             _ => unreachable!(),
@@ -35,13 +38,40 @@ impl OnyxError {
             self.get_column(),
             self.message(true)).as_str());
         out.push_str(format!("{}{}\n", 
-            format!("{:>5} | ", self.get_line_number() - 1).bright_blue(),
+            format!("{:>5} │ ", self.get_line_number() - 1).bright_blue(),
             self.get_contents_of_line(self.get_line_number()).unwrap()).as_str());
-        out.push_str(format!("{}{}\n",
-            format!("{:>5} | ", "").bright_blue(),
-            format!("{}- {}",
-                " ".repeat(self.get_column() - 1) + "^".repeat(self.span().get_end() - self.span().get_start()).as_str(),
+        out.push_str(format!("{}{}\n", 
+            format!("{:>5} │ ", "").bright_blue(),
+            format!("{}",
+                " ".repeat(self.get_column() - 1) + "┯".repeat(self.span().get_end() - self.span().get_start()).as_str()).red()).as_str());
+        
+
+        if let OnyxError::TypeErrorWithHint(_, _, _, _) = self {
+            out.push_str(format!("{}{}\n",
+            format!("{:>5} │ ", "").bright_blue(),
+            format!("{}━ {}",
+                " ".repeat(self.get_column() - 1) + "┝".repeat(self.span().get_end() - self.span().get_start()).as_str(),
                 self.message(false)).red()).as_str());
+            let hint_span = match self {
+                OnyxError::TypeErrorWithHint(_, _, _, s) => s.clone(),
+                _ => unreachable!(),
+            };
+            let hint: String = match self {
+                OnyxError::TypeErrorWithHint(_, _, h, _) => h.clone(),
+                _ => unreachable!(),
+            };
+            out.push_str(format!("{}{}\n",
+                format!("{:>5} │ ", "").bright_blue(),
+                format!("{}━━ {}",
+                    " ".repeat(self.get_column() - 1) + "┕".repeat(hint_span.get_end() - hint_span.get_start()).as_str(),
+                    format!("{}", hint)).yellow()).as_str());
+        } else {
+            out.push_str(format!("{}{}\n",
+            format!("{:>5} │ ", "").bright_blue(),
+            format!("{}━ {}",
+                " ".repeat(self.get_column() - 1) + "┕".repeat(self.span().get_end() - self.span().get_start()).as_str(),
+                self.message(false)).red()).as_str());
+        }
 
         out
     }
