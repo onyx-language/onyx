@@ -135,7 +135,7 @@ impl ParsedBlock {
 #[derive(Debug, Clone)] pub enum ParsedExpression {
     Assignment(Box<ParsedExpression>, Box<ParsedExpression>, Span),
     Boolean(bool, Span),
-    Call(Box<ParsedExpression>, Vec<ParsedExpression>, Span),
+    Call(Box<ParsedExpression>, Vec<(Option<String>, ParsedExpression)>, Span),
     Character(char, Span),
     FloatingPoint(f64, Span),
     Identifier(String, Span),
@@ -534,10 +534,17 @@ impl Parser {
             match self.tokens[self.index].kind() {
                 TokenKind::LeftParen => {
                     self.index += 1;
-                    let mut arguments: Vec<ParsedExpression> = vec![];
+                    let mut arguments: Vec<(Option<String>, ParsedExpression)> = vec![];
                     while self.tokens[self.index].kind() != TokenKind::RightParen {
-                        // TODO: Add support for named arguments (e.g. `foo(bar: 1, baz: 2)`)
-                        arguments.push(self.parse_expression()?);
+                        if self.tokens[self.index + 1].kind() == TokenKind::Colon {
+                            let name: String = self.parse_identifier()?;
+                            self.expect(TokenKind::Colon)?;
+                            let argument: ParsedExpression = self.parse_expression()?;
+                            arguments.push((Some(name), argument));
+                        } else {
+                            let argument: ParsedExpression = self.parse_expression()?;
+                            arguments.push((None, argument));
+                        }
                         if self.tokens[self.index].kind() == TokenKind::Comma {
                             self.expect(TokenKind::Comma)?;
                         }
