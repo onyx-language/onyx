@@ -132,8 +132,42 @@ impl ParsedBlock {
         body: ParsedBody,
     },
 }
+#[derive(Debug, Clone)] pub enum BinaryOperator {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulo,
+    Exponent,
+    Equal,
+    NotEqual,
+    LessThan,
+    LessThanOrEqual,
+    GreaterThan,
+    GreaterThanOrEqual,
+    And,
+    Or,
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
+    BitwiseLeftShift,
+    BitwiseRightShift,
+    Range,
+    RangeInclusive,
+    RangeTo,
+    RangeToInclusive,
+}
+#[derive(Debug, Clone)] pub enum UnaryOperator {
+    Negate,
+    Not,
+    BitwiseNot,
+    Increment,
+    Decrement,
+}
 #[derive(Debug, Clone)] pub enum ParsedExpression {
+    Array(Vec<ParsedExpression>, Span),
     Assignment(Box<ParsedExpression>, Box<ParsedExpression>, Span),
+    BinaryOperation(Box<ParsedExpression>, BinaryOperator, Box<ParsedExpression>, Span),
     Boolean(bool, Span),
     Call(Box<ParsedExpression>, Vec<(Option<String>, ParsedExpression)>, Span),
     Character(char, Span),
@@ -141,8 +175,10 @@ impl ParsedBlock {
     Identifier(String, Span),
     Match(Box<ParsedExpression>, Vec<MatchCase>, Span),
     MemberAccess(Box<ParsedExpression>, Box<ParsedExpression>, Span),
+    Null(Span),
     Number(i64, Span),
     String(String, Span),
+    UnaryOperation(UnaryOperator, Box<ParsedExpression>, Span),
 }
 #[derive(Debug, Clone)] pub struct Parser {
     pub tokens: Vec<Token>,
@@ -519,7 +555,7 @@ impl Parser {
         let mut expression: ParsedExpression = self.parse_call_expression()?;
         loop {
             match self.tokens[self.index].kind() {
-                TokenKind::Equals => {
+                TokenKind::Equal => {
                     self.index += 1;
                     expression = ParsedExpression::Assignment(Box::new(expression), Box::new(self.parse_expression()?), span.clone());
                 }
@@ -529,7 +565,7 @@ impl Parser {
         Ok(expression)
     }
     fn parse_call_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
-        let mut expression: ParsedExpression = self.parse_postfix_expression()?;
+        let mut expression: ParsedExpression = self.parse_equality_expression()?;
         loop {
             match self.tokens[self.index].kind() {
                 TokenKind::LeftParen => {
@@ -556,6 +592,137 @@ impl Parser {
             }
         }
         Ok(expression)
+    }
+    fn parse_equality_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
+        let mut expression: ParsedExpression = self.parse_comparison_expression()?;
+        loop {
+            match self.tokens[self.index].kind() {
+                TokenKind::Equals => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::Equal, Box::new(self.parse_expression()?), self.span());
+                }
+                TokenKind::NotEqual => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::NotEqual, Box::new(self.parse_expression()?), self.span());
+                }
+                _ => break,
+            }
+        }
+        Ok(expression)
+    }
+    fn parse_comparison_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
+        let mut expression: ParsedExpression = self.parse_additive_expression()?;
+        loop {
+            match self.tokens[self.index].kind() {
+                TokenKind::LessThan => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::LessThan, Box::new(self.parse_expression()?), self.span());
+                }
+                TokenKind::LessThanOrEqual => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::LessThanOrEqual, Box::new(self.parse_expression()?), self.span());
+                }
+                TokenKind::GreaterThan => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::GreaterThan, Box::new(self.parse_expression()?), self.span());
+                }
+                TokenKind::GreaterThanOrEqual => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::GreaterThanOrEqual, Box::new(self.parse_expression()?), self.span());
+                }
+                _ => break,
+            }
+        }
+        Ok(expression)
+    }
+    fn parse_additive_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
+        let mut expression: ParsedExpression = self.parse_multiplicative_expression()?;
+        loop {
+            match self.tokens[self.index].kind() {
+                TokenKind::Plus => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::Add, Box::new(self.parse_expression()?), self.span());
+                }
+                TokenKind::Minus => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::Subtract, Box::new(self.parse_expression()?), self.span());
+                }
+                _ => break,
+            }
+        }
+        Ok(expression)
+    }
+    fn parse_multiplicative_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
+        let mut expression: ParsedExpression = self.parse_range_expression()?;
+        loop {
+            match self.tokens[self.index].kind() {
+                TokenKind::Star => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::Multiply, Box::new(self.parse_expression()?), self.span());
+                }
+                TokenKind::Slash => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::Divide, Box::new(self.parse_expression()?), self.span());
+                }
+                TokenKind::Percent => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::Modulo, Box::new(self.parse_expression()?), self.span());
+                }
+                _ => break,
+            }
+        }
+        Ok(expression)
+    }
+    fn parse_range_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
+        let mut expression: ParsedExpression = self.parse_unary_expression()?;
+        loop {
+            match self.tokens[self.index].kind() {
+                TokenKind::Range => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::Range, Box::new(self.parse_expression()?), self.span());
+                }
+                TokenKind::RangeInclusive => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::RangeInclusive, Box::new(self.parse_expression()?), self.span());
+                }
+                TokenKind::RangeTo => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::RangeTo, Box::new(self.parse_expression()?), self.span());
+                }
+                TokenKind::RangeToInclusive => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::RangeToInclusive, Box::new(self.parse_expression()?), self.span());
+                }
+                _ => break,
+            }
+        }
+        Ok(expression)
+    }
+    fn parse_unary_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
+        let span: Span = self.span();
+        match self.tokens[self.index].kind() {
+            TokenKind::Minus => {
+                self.index += 1;
+                Ok(ParsedExpression::UnaryOperation(UnaryOperator::Negate, Box::new(self.parse_unary_expression()?), span))
+            }
+            TokenKind::ExclamationMark => {
+                self.index += 1;
+                Ok(ParsedExpression::UnaryOperation(UnaryOperator::Not, Box::new(self.parse_unary_expression()?), span))
+            }
+            TokenKind::BitwiseNot => {
+                self.index += 1;
+                Ok(ParsedExpression::UnaryOperation(UnaryOperator::BitwiseNot, Box::new(self.parse_unary_expression()?), span))
+            }
+            TokenKind::Increment => {
+                self.index += 1;
+                Ok(ParsedExpression::UnaryOperation(UnaryOperator::Increment, Box::new(self.parse_unary_expression()?), span))
+            }
+            TokenKind::Decrement => {
+                self.index += 1;
+                Ok(ParsedExpression::UnaryOperation(UnaryOperator::Decrement, Box::new(self.parse_unary_expression()?), span))
+            }
+            _ => self.parse_postfix_expression(),
+        }
     }
     fn parse_postfix_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
         let span: Span = self.span();
@@ -598,6 +765,10 @@ impl Parser {
                 self.index += 1;
                 Ok(ParsedExpression::Character(character, current_token.span()))
             }
+            TokenKind::Null => {
+                self.index += 1;
+                Ok(ParsedExpression::Null(current_token.span()))
+            }
             TokenKind::Match => {
                 self.expect(TokenKind::Match)?;
                 let expression: ParsedExpression = self.parse_expression()?;
@@ -611,6 +782,18 @@ impl Parser {
                 }
                 self.expect(TokenKind::RightBrace)?;
                 Ok(ParsedExpression::Match(Box::new(expression), cases, current_token.span()))
+            }
+            TokenKind::LeftBracket => {
+                self.expect(TokenKind::LeftBracket)?;
+                let mut elements: Vec<ParsedExpression> = vec![];
+                while self.tokens[self.index].kind() != TokenKind::RightBracket {
+                    elements.push(self.parse_expression()?);
+                    if self.tokens[self.index].kind() == TokenKind::Comma {
+                        self.expect(TokenKind::Comma)?;
+                    }
+                }
+                self.expect(TokenKind::RightBracket)?;
+                Ok(ParsedExpression::Array(elements, current_token.span()))
             }
             _ => {
                 let err = OnyxError::SyntaxError(format!("invalid primary expression: {:?}", self.tokens[self.index].kind()), self.span());

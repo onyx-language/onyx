@@ -15,6 +15,7 @@ pub enum TokenKind {
     Function,       // function
     Match,          // match
     Named,          // named
+    Null,           // null
     Override,       // override
     Public,         // public
     Private,        // private
@@ -32,15 +33,50 @@ pub enum TokenKind {
     LeftBracket,    // [
     RightBracket,   // ]
 
-    Equals,         // =
-    LessThan,       // <
-    GreaterThan,    // >
+    Equal,              // =
+    Plus,               // +
+    Minus,              // -
+    Star,               // *
+    Slash,              // /
+    Percent,            // %
+    Caret,              // ^
+    Equals,             // ==
+    NotEqual,           // !=
+    LessThan,           // <
+    LessThanOrEqual,    // <=
+    GreaterThan,        // >
+    GreaterThanOrEqual, // >=
+    And,                // &&
+    Or,                 // ||
+    BitwiseAnd,         // &
+    BitwiseOr,          // |
+    BitwiseNot,         // ~
+    BitwiseLeftShift,   // <<
+    BitwiseRightShift,  // >>
+    Range,              // ..
+    RangeInclusive,     // ..=
+    RangeTo,            // ..<
+    RangeToInclusive,   // ..<=
+    PlusEqual,          // +=
+    MinusEqual,         // -=
+    StarEqual,          // *=
+    SlashEqual,         // /=
+    PercentEqual,       // %=
+    CaretEqual,         // ^=
+    BitwiseAndEqual,    // &=
+    BitwiseOrEqual,     // |=
+    BitwiseNotEqual,    // ~=
+    BitwiseLeftShiftEqual,  // <<=
+    BitwiseRightShiftEqual, // >>=
+    Increment,          // ++
+    Decrement,          // --
 
     Colon,          // :
     Semicolon,      // ;
     Dot,            // .
     Comma,          // ,
     QuestionMark,   // ?
+    ExclamationMark,// !
 
     Arrow,          // ->
     FatArrow,       // =>

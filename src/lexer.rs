@@ -98,6 +98,7 @@ impl OnyxLexer {
                             "function" => TokenKind::Function,
                             "match" => TokenKind::Match,
                             "named" => TokenKind::Named,
+                            "null" => TokenKind::Null,
                             "override" => TokenKind::Override,
                             "private" => TokenKind::Private,
                             "protected" => TokenKind::Protected,
@@ -204,20 +205,76 @@ impl OnyxLexer {
                 '<' => {
                     self.index += 1;
                     self.end += 1;
-                    tokens.push(Token::new(
-                        TokenKind::LessThan,
-                        Span::new(self.file_name.clone(), self.start, self.end),
-                    ));
-                    self.start += 1;
+                    if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::LessThanOrEqual,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 2;
+                    } else if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '<' {
+                        self.index += 1;
+                        self.end += 1;
+                        if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                            self.index += 1;
+                            self.end += 1;
+                            tokens.push(Token::new(
+                                TokenKind::BitwiseLeftShiftEqual,
+                                Span::new(self.file_name.clone(), self.start, self.end),
+                            ));
+                            self.start += 3;
+                        } else {
+                            tokens.push(Token::new(
+                                TokenKind::BitwiseLeftShift,
+                                Span::new(self.file_name.clone(), self.start, self.end),
+                            ));
+                            self.start += 2;
+                        }
+                    } else {
+                        tokens.push(Token::new(
+                            TokenKind::LessThan,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 1;
+                    }
                 }
                 '>' => {
                     self.index += 1;
                     self.end += 1;
-                    tokens.push(Token::new(
-                        TokenKind::GreaterThan,
-                        Span::new(self.file_name.clone(), self.start, self.end),
-                    ));
-                    self.start += 1;
+                    if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::GreaterThanOrEqual,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 2;
+                    } else if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '>' {
+                        self.index += 1;
+                        self.end += 1;
+                        if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                            self.index += 1;
+                            self.end += 1;
+                            tokens.push(Token::new(
+                                TokenKind::BitwiseRightShiftEqual,
+                                Span::new(self.file_name.clone(), self.start, self.end),
+                            ));
+                            self.start += 3;
+                        } else {
+                            tokens.push(Token::new(
+                                TokenKind::BitwiseRightShift,
+                                Span::new(self.file_name.clone(), self.start, self.end),
+                            ));
+                            self.start += 2;
+                        }
+                    } else {
+                        tokens.push(Token::new(
+                            TokenKind::GreaterThan,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 1;
+                    }
                 }
                 ':' => {
                     self.index += 1;
@@ -256,6 +313,43 @@ impl OnyxLexer {
                         self.start = self.end;
                         continue;
                     }
+                    if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '.' {
+                        self.index += 1;
+                        self.end += 1;
+                        if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                            self.index += 1;
+                            self.end += 1;
+                            tokens.push(Token::new(
+                                TokenKind::RangeInclusive,
+                                Span::new(self.file_name.clone(), self.start, self.end),
+                            ));
+                            self.start += 3;
+                        } else if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '<' {
+                            self.index += 1;
+                            self.end += 1;
+                            if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                                self.index += 1;
+                                self.end += 1;
+                                tokens.push(Token::new(
+                                    TokenKind::RangeToInclusive,
+                                    Span::new(self.file_name.clone(), self.start, self.end),
+                                ));
+                                self.start += 4;
+                            } else {
+                                tokens.push(Token::new(
+                                    TokenKind::RangeTo,
+                                    Span::new(self.file_name.clone(), self.start, self.end),
+                                ));
+                                self.start += 3;
+                            }
+                        } else {
+                            tokens.push(Token::new(
+                                TokenKind::Range,
+                                Span::new(self.file_name.clone(), self.start, self.end),
+                            ));
+                            self.start += 2;
+                        }
+                    }
                     tokens.push(Token::new(
                         TokenKind::Dot,
                         Span::new(self.file_name.clone(), self.start, self.end),
@@ -280,6 +374,33 @@ impl OnyxLexer {
                     ));
                     self.start += 1;
                 }
+                '+' => {
+                    self.index += 1;
+                    self.end += 1;
+                    if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::PlusEqual,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 2;
+                    } else if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '+' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::Increment,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 2;
+                    } else {
+                        tokens.push(Token::new(
+                            TokenKind::Plus,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 1;
+                    }
+                }
                 '-' => {
                     self.index += 1;
                     self.end += 1;
@@ -291,11 +412,46 @@ impl OnyxLexer {
                             Span::new(self.file_name.clone(), self.start, self.end),
                         ));
                         self.start += 1;
+                    } else if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::MinusEqual,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 2;
+                    } else if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '-' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::Decrement,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 2;
                     } else {
-                        // tokens.push(Token::new(
-                        //     TokenKind::Minus,
-                        //     Span::new(self.file_name.clone(), self.start, self.end),
-                        // ));
+                        tokens.push(Token::new(
+                            TokenKind::Minus,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 1;
+                    }
+                }
+                '*' => {
+                    self.index += 1;
+                    self.end += 1;
+                    if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::StarEqual,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 2;
+                    } else {
+                        tokens.push(Token::new(
+                            TokenKind::Star,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
                         self.start += 1;
                     }
                 }
@@ -312,11 +468,111 @@ impl OnyxLexer {
                         self.index += 1;
                         self.end += 1;
                         self.start = self.end;
+                    } else if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::SlashEqual,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 2;
                     } else {
-                        // tokens.push(Token::new(
-                        //     TokenKind::Slash,
-                        //     Span::new(self.file_name.clone(), self.start, self.end),
-                        // ));
+                        tokens.push(Token::new(
+                            TokenKind::Slash,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 1;
+                    }
+                }
+                '%' => {
+                    self.index += 1;
+                    self.end += 1;
+                    if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::PercentEqual,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 2;
+                    } else {
+                        tokens.push(Token::new(
+                            TokenKind::Percent,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 1;
+                    }
+                }
+                '^' => {
+                    self.index += 1;
+                    self.end += 1;
+                    if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::CaretEqual,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 2;
+                    } else {
+                        tokens.push(Token::new(
+                            TokenKind::Caret,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 1;
+                    }
+                }
+                '&' => {
+                    self.index += 1;
+                    self.end += 1;
+                    if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '&' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::And,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 2;
+                    } else if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::BitwiseAndEqual,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 2;
+                    } else {
+                        tokens.push(Token::new(
+                            TokenKind::BitwiseAnd,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 1;
+                    }
+                }
+                '|' => {
+                    self.index += 1;
+                    self.end += 1;
+                    if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '|' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::Or,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 2;
+                    } else if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::BitwiseOrEqual,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 2;
+                    } else {
+                        tokens.push(Token::new(
+                            TokenKind::BitwiseOr,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
                         self.start += 1;
                     }
                 }
@@ -331,9 +587,55 @@ impl OnyxLexer {
                             Span::new(self.file_name.clone(), self.start, self.end),
                         ));
                         self.start += 1;
-                    } else {
+                    } else if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                        self.index += 1;
+                        self.end += 1;
                         tokens.push(Token::new(
                             TokenKind::Equals,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 1;
+                    } else {
+                        tokens.push(Token::new(
+                            TokenKind::Equal,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 1;
+                    }
+                }
+                '!' => {
+                    self.index += 1;
+                    self.end += 1;
+                    if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::NotEqual,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 1;
+                    } else {
+                        tokens.push(Token::new(
+                            TokenKind::ExclamationMark,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 1;
+                    }
+                }
+                '~' => {
+                    self.index += 1;
+                    self.end += 1;
+                    if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '=' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::BitwiseNotEqual,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 1;
+                    } else {
+                        tokens.push(Token::new(
+                            TokenKind::BitwiseNot,
                             Span::new(self.file_name.clone(), self.start, self.end),
                         ));
                         self.start += 1;
