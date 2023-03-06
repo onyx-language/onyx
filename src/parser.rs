@@ -134,10 +134,14 @@ impl ParsedBlock {
 }
 #[derive(Debug, Clone)] pub enum ParsedExpression {
     Assignment(Box<ParsedExpression>, Box<ParsedExpression>, Span),
+    Boolean(bool, Span),
+    Character(char, Span),
+    FloatingPoint(f64, Span),
     Identifier(String, Span),
     Match(Box<ParsedExpression>, Vec<MatchCase>, Span),
     MemberAccess(Box<ParsedExpression>, Box<ParsedExpression>, Span),
     Number(i64, Span),
+    String(String, Span),
 }
 #[derive(Debug, Clone)] pub struct Parser {
     pub tokens: Vec<Token>,
@@ -547,6 +551,22 @@ impl Parser {
             TokenKind::Number(number) => {
                 self.index += 1;
                 Ok(ParsedExpression::Number(number, current_token.span()))
+            }
+            TokenKind::Float(float) => {
+                self.index += 1;
+                Ok(ParsedExpression::FloatingPoint(float, current_token.span()))
+            }
+            TokenKind::String(string) => {
+                self.index += 1;
+                Ok(ParsedExpression::String(string, current_token.span()))
+            }
+            TokenKind::Bool(value) => {
+                self.index += 1;
+                Ok(ParsedExpression::Boolean(value, current_token.span()))
+            }
+            TokenKind::Char(character) => {
+                self.index += 1;
+                Ok(ParsedExpression::Character(character, current_token.span()))
             }
             TokenKind::Match => {
                 self.expect(TokenKind::Match)?;

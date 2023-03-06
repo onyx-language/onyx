@@ -1,0 +1,8 @@
+function main(args: [String]) -> void {
+    var a: f32 = 0.123;
+    var b: f64 = .23;
+    var c: char = 'a';
+    var d: bool = true;
+    var e: bool = false;
+    var f: String = "hi";
+}
