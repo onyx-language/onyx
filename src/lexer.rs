@@ -59,16 +59,25 @@ impl OnyxLexer {
                 }
                 '0'..='9' => {
                     let mut number = String::new();
-                    while self.content.as_ref().unwrap().chars().nth(self.index).unwrap().is_numeric() {
+                    while self.content.as_ref().unwrap().chars().nth(self.index).unwrap().is_numeric() ||
+                            self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == '.' {
                         number.push(self.content.as_ref().unwrap().chars().nth(self.index).unwrap());
                         self.index += 1;
                         self.end += 1;
                     }
                     self.start += 1;
-                    tokens.push(Token::new(
-                        TokenKind::Number(number.parse::<i64>().unwrap()),
-                        Span::new(self.file_name.clone(), self.start, self.end),
-                    ));
+
+                    if number.contains('.') {
+                        tokens.push(Token::new(
+                            TokenKind::Float(number.parse::<f64>().unwrap()),
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                    } else {
+                        tokens.push(Token::new(
+                            TokenKind::Number(number.parse::<i64>().unwrap()),
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                    }
                     self.start = self.end;
                 }
                 'a'..='z' | 'A'..='Z' | '_' => {
@@ -80,6 +89,8 @@ impl OnyxLexer {
                     }
                     tokens.push(Token::new(
                         match identifier.as_str() {
+                            "true" => TokenKind::Bool(true),
+                            "false" => TokenKind::Bool(false),
                             "class" => TokenKind::Class,
                             "const" => TokenKind::Const,
                             "defer" => TokenKind::Defer,
@@ -98,6 +109,40 @@ impl OnyxLexer {
                             "weak" => TokenKind::Weak,
                             _ => TokenKind::Identifier(identifier),
                         },
+                        Span::new(self.file_name.clone(), self.start, self.end),
+                    ));
+                    self.start = self.end;
+                }
+                '"' => {
+                    let mut string = String::new();
+                    self.index += 1;
+                    self.end += 1;
+                    while self.content.as_ref().unwrap().chars().nth(self.index).unwrap() != '"' {
+                        string.push(self.content.as_ref().unwrap().chars().nth(self.index).unwrap());
+                        self.index += 1;
+                        self.end += 1;
+                    }
+                    self.index += 1;
+                    self.end += 1;
+                    tokens.push(Token::new(
+                        TokenKind::String(string),
+                        Span::new(self.file_name.clone(), self.start, self.end),
+                    ));
+                    self.start = self.end;
+                }
+                '\'' => {
+                    let mut character = String::new();
+                    self.index += 1;
+                    self.end += 1;
+                    while self.content.as_ref().unwrap().chars().nth(self.index).unwrap() != '\'' {
+                        character.push(self.content.as_ref().unwrap().chars().nth(self.index).unwrap());
+                        self.index += 1;
+                        self.end += 1;
+                    }
+                    self.index += 1;
+                    self.end += 1;
+                    tokens.push(Token::new(
+                        TokenKind::Char(character.chars().nth(0).unwrap()),
                         Span::new(self.file_name.clone(), self.start, self.end),
                     ));
                     self.start = self.end;
@@ -195,6 +240,22 @@ impl OnyxLexer {
                 '.' => {
                     self.index += 1;
                     self.end += 1;
+                    if self.content.as_ref().unwrap().chars().nth(self.index).unwrap().is_numeric() {
+                        let mut number = String::new();
+                        number.push('0');
+                        number.push('.');
+                        while self.content.as_ref().unwrap().chars().nth(self.index).unwrap().is_numeric() {
+                            number.push(self.content.as_ref().unwrap().chars().nth(self.index).unwrap());
+                            self.index += 1;
+                            self.end += 1;
+                        }
+                        tokens.push(Token::new(
+                            TokenKind::Float(number.parse::<f64>().unwrap()),
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start = self.end;
+                        continue;
+                    }
                     tokens.push(Token::new(
                         TokenKind::Dot,
                         Span::new(self.file_name.clone(), self.start, self.end),
