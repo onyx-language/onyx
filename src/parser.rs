@@ -559,6 +559,26 @@ impl Parser {
                     self.index += 1;
                     expression = ParsedExpression::Assignment(Box::new(expression), Box::new(self.parse_expression()?), span.clone());
                 }
+                TokenKind::PlusEqual => {
+                    self.index += 1;
+                    expression = ParsedExpression::Assignment(Box::new(expression.clone()), Box::new(ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::Add, Box::new(self.parse_expression()?), span.clone())), span.clone());
+                }
+                TokenKind::MinusEqual => {
+                    self.index += 1;
+                    expression = ParsedExpression::Assignment(Box::new(expression.clone()), Box::new(ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::Subtract, Box::new(self.parse_expression()?), span.clone())), span.clone());
+                }
+                TokenKind::StarEqual => {
+                    self.index += 1;
+                    expression = ParsedExpression::Assignment(Box::new(expression.clone()), Box::new(ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::Multiply, Box::new(self.parse_expression()?), span.clone())), span.clone());
+                }
+                TokenKind::SlashEqual => {
+                    self.index += 1;
+                    expression = ParsedExpression::Assignment(Box::new(expression.clone()), Box::new(ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::Divide, Box::new(self.parse_expression()?), span.clone())), span.clone());
+                }
+                TokenKind::PercentEqual => {
+                    self.index += 1;
+                    expression = ParsedExpression::Assignment(Box::new(expression.clone()), Box::new(ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::Modulo, Box::new(self.parse_expression()?), span.clone())), span.clone());
+                }
                 _ => break,
             }
         }
@@ -732,6 +752,14 @@ impl Parser {
                 TokenKind::Dot => {
                     self.index += 1;
                     expression = ParsedExpression::MemberAccess(Box::new(expression), Box::new(self.parse_expression()?), span.clone());
+                }
+                TokenKind::Increment => {
+                    self.index += 1;
+                    expression = ParsedExpression::UnaryOperation(UnaryOperator::Increment, Box::new(expression), span.clone());
+                }
+                TokenKind::Decrement => {
+                    self.index += 1;
+                    expression = ParsedExpression::UnaryOperation(UnaryOperator::Decrement, Box::new(expression), span.clone());
                 }
                 _ => break,
             }
