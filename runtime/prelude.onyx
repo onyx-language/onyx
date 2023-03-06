@@ -8,7 +8,7 @@ class String {
     private var length: usize;
     public function create(data: [u8]) -> String {
         this.data = data;
-        this.length = length.size;
+        this.length = length.size();
     }
     public function length(this) -> usize => this.length;
 }

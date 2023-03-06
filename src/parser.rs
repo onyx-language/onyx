@@ -135,6 +135,7 @@ impl ParsedBlock {
 #[derive(Debug, Clone)] pub enum ParsedExpression {
     Assignment(Box<ParsedExpression>, Box<ParsedExpression>, Span),
     Boolean(bool, Span),
+    Call(Box<ParsedExpression>, Vec<ParsedExpression>, Span),
     Character(char, Span),
     FloatingPoint(f64, Span),
     Identifier(String, Span),
@@ -515,12 +516,34 @@ impl Parser {
     }
     fn parse_assignment_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
         let span: Span = self.span();
-        let mut expression: ParsedExpression = self.parse_postfix_expression()?;
+        let mut expression: ParsedExpression = self.parse_call_expression()?;
         loop {
             match self.tokens[self.index].kind() {
                 TokenKind::Equals => {
                     self.index += 1;
                     expression = ParsedExpression::Assignment(Box::new(expression), Box::new(self.parse_expression()?), span.clone());
+                }
+                _ => break,
+            }
+        }
+        Ok(expression)
+    }
+    fn parse_call_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
+        let mut expression: ParsedExpression = self.parse_postfix_expression()?;
+        loop {
+            match self.tokens[self.index].kind() {
+                TokenKind::LeftParen => {
+                    self.index += 1;
+                    let mut arguments: Vec<ParsedExpression> = vec![];
+                    while self.tokens[self.index].kind() != TokenKind::RightParen {
+                        // TODO: Add support for named arguments (e.g. `foo(bar: 1, baz: 2)`)
+                        arguments.push(self.parse_expression()?);
+                        if self.tokens[self.index].kind() == TokenKind::Comma {
+                            self.expect(TokenKind::Comma)?;
+                        }
+                    }
+                    self.expect(TokenKind::RightParen)?;
+                    expression = ParsedExpression::Call(Box::new(expression), arguments, self.span());
                 }
                 _ => break,
             }
