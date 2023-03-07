@@ -3,6 +3,7 @@ use onyx::{
     error::OnyxError,
     tokens::Token,
     parser::{ Parser, ParsedAST },
+    typechecker::{ Typechecker, CheckedAST },
 };
 
 fn main() {
@@ -21,19 +22,19 @@ fn main() {
                     for statement in &ast.statements {
                         println!("{:?}", statement);
                     }
-                    // NOTE: I don't remember how well this typechecker works, so it's commented out for now.
-                    // let mut typechecker: Typechecker = Typechecker::new(ast);
-                    // let checked_ast: Result<CheckedAST, Vec<OnyxError>> = typechecker.typecheck();
-                    // match checked_ast {
-                    //     Ok(checked_ast) => {
-                    //         println!("{:?}", checked_ast);
-                    //     }
-                    //     Err(errors) => {
-                    //         for error in errors {
-                    //             println!("{}", error.to_string());
-                    //         }
-                    //     }
-                    // }
+                    let mut typechecker: Typechecker = Typechecker::new(&ast);
+                    let checked_ast: Result<CheckedAST, Vec<OnyxError>> = typechecker.typecheck();
+                    match checked_ast {
+                        Ok(checked_ast) => {
+                            println!("{:?}", checked_ast);
+                            println!("{:#?}", typechecker);
+                        }
+                        Err(errors) => {
+                            for error in errors {
+                                println!("{}", error.to_string());
+                            }
+                        }
+                    }
                 }
                 Err(errors) => {
                     for error in errors {
