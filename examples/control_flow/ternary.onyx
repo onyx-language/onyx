@@ -1,0 +1,3 @@
+function main() -> void {
+    defer 1 == 2 ? "bruh" : 69;
+}

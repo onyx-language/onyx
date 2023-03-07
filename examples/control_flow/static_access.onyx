@@ -1,0 +1,9 @@
+class Foo {
+    public function my_static_method() -> void {
+        println("this is static");
+    }
+}
+
+function main() -> void {
+    Foo::my_static_method();
+}

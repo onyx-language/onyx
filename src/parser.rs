@@ -755,6 +755,10 @@ impl Parser {
                     self.index += 1;
                     expression = ParsedExpression::MemberAccess(Box::new(expression), Box::new(self.parse_expression()?), span.clone());
                 }
+                TokenKind::StaticAccess => {
+                    self.expect(TokenKind::StaticAccess)?;
+                    expression = ParsedExpression::StaticMemberAccess(Box::new(expression), Box::new(self.parse_expression()?), span.clone());
+                }
                 TokenKind::Increment => {
                     self.index += 1;
                     expression = ParsedExpression::UnaryOperation(UnaryOperator::Increment, Box::new(expression), span.clone());
@@ -768,7 +772,7 @@ impl Parser {
                     let true_case: ParsedExpression = self.parse_expression()?;
                     self.expect(TokenKind::Colon)?;
                     let false_case: ParsedExpression = self.parse_expression()?;
-                    expression = ParsedExpression::TernaryOperator(Box::new(expression), Box::new(true_case), Box::new(false_case), span.clone())
+                    expression = ParsedExpression::TernaryOperator(Box::new(expression), Box::new(true_case), Box::new(false_case), span.clone());
                 }
                 _ => break,
             }
