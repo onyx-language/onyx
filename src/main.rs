@@ -3,7 +3,6 @@ use onyx::{
     error::OnyxError,
     tokens::Token,
     parser::{ Parser, ParsedAST },
-    typechecker::{ Typechecker, CheckedAST },
 };
 
 fn main() {
