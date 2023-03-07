@@ -279,11 +279,21 @@ impl OnyxLexer {
                 ':' => {
                     self.index += 1;
                     self.end += 1;
-                    tokens.push(Token::new(
-                        TokenKind::Colon,
-                        Span::new(self.file_name.clone(), self.start, self.end),
-                    ));
-                    self.start += 1;
+                    if self.content.as_ref().unwrap().chars().nth(self.index).unwrap() == ':' {
+                        self.index += 1;
+                        self.end += 1;
+                        tokens.push(Token::new(
+                            TokenKind::StaticAccess,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 2;
+                    } else {
+                        tokens.push(Token::new(
+                            TokenKind::Colon,
+                            Span::new(self.file_name.clone(), self.start, self.end),
+                        ));
+                        self.start += 1;
+                    }
                 }
                 ';' => {
                     self.index += 1;

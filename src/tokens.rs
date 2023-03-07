@@ -80,6 +80,7 @@ pub enum TokenKind {
 
     Arrow,          // ->
     FatArrow,       // =>
+    StaticAccess,   // ::
 }
 #[derive(Clone, Debug)]
 pub struct Token { kind: TokenKind, span: Span }

@@ -177,7 +177,9 @@ impl ParsedBlock {
     MemberAccess(Box<ParsedExpression>, Box<ParsedExpression>, Span),
     Null(Span),
     Number(i64, Span),
+    StaticMemberAccess(Box<ParsedExpression>, Box<ParsedExpression>, Span),
     String(String, Span),
+    TernaryOperator(Box<ParsedExpression>, Box<ParsedExpression>, Box<ParsedExpression>, Span),
     UnaryOperation(UnaryOperator, Box<ParsedExpression>, Span),
 }
 #[derive(Debug, Clone)] pub struct Parser {
@@ -760,6 +762,13 @@ impl Parser {
                 TokenKind::Decrement => {
                     self.index += 1;
                     expression = ParsedExpression::UnaryOperation(UnaryOperator::Decrement, Box::new(expression), span.clone());
+                }
+                TokenKind::QuestionMark => {
+                    self.expect(TokenKind::QuestionMark)?;
+                    let true_case: ParsedExpression = self.parse_expression()?;
+                    self.expect(TokenKind::Colon)?;
+                    let false_case: ParsedExpression = self.parse_expression()?;
+                    expression = ParsedExpression::TernaryOperator(Box::new(expression), Box::new(true_case), Box::new(false_case), span.clone())
                 }
                 _ => break,
             }
