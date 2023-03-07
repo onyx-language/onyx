@@ -98,11 +98,30 @@ impl ParsedMethod {
     Function(ParsedFunction),
     Class(ParsedClass)
 }
+impl ParsedFirstClassStatement {
+    pub fn span(&self) -> Span {
+        match self {
+            ParsedFirstClassStatement::Enum(parsed_enum) => parsed_enum.span.clone(),
+            ParsedFirstClassStatement::Function(parsed_function) => parsed_function.name_span.clone(),
+            ParsedFirstClassStatement::Class(parsed_class) => parsed_class.name_span.clone(),
+        }
+    }
+}
 #[derive(Debug, Clone)] pub enum ParsedStatement {
     Defer(ParsedBody, Span),
     Expression(ParsedExpression),
     Return(Option<ParsedExpression>, Span),
     VariableDeclaration(ParsedVariableDeclaration),
+}
+impl ParsedStatement {
+    pub fn span(&self) -> Span {
+        match self {
+            ParsedStatement::Defer(_, span) => span.clone(),
+            ParsedStatement::Expression(expr) => expr.span().clone(),
+            ParsedStatement::Return(_, span) => span.clone(),
+            ParsedStatement::VariableDeclaration(decl) => decl.span.clone(),
+        }
+    }
 }
 #[derive(Debug, Clone)] pub struct ParsedBlock {
     pub stmts: Vec<ParsedStatement>,
@@ -177,10 +196,34 @@ impl ParsedBlock {
     MemberAccess(Box<ParsedExpression>, Box<ParsedExpression>, Span),
     Null(Span),
     Number(i64, Span),
+    Sizeof(ParsedType, Span),
     StaticMemberAccess(Box<ParsedExpression>, Box<ParsedExpression>, Span),
     String(String, Span),
     TernaryOperator(Box<ParsedExpression>, Box<ParsedExpression>, Box<ParsedExpression>, Span),
     UnaryOperation(UnaryOperator, Box<ParsedExpression>, Span),
+}
+impl ParsedExpression {
+    pub fn span(&self) -> Span {
+        match self {
+            ParsedExpression::Array(_, span) => span.clone(),
+            ParsedExpression::Assignment(_, _, span) => span.clone(),
+            ParsedExpression::BinaryOperation(_, _, _, span) => span.clone(),
+            ParsedExpression::Boolean(_, span) => span.clone(),
+            ParsedExpression::Call(_, _, span) => span.clone(),
+            ParsedExpression::Character(_, span) => span.clone(),
+            ParsedExpression::FloatingPoint(_, span) => span.clone(),
+            ParsedExpression::Identifier(_, span) => span.clone(),
+            ParsedExpression::Match(_, _, span) => span.clone(),
+            ParsedExpression::MemberAccess(_, _, span) => span.clone(),
+            ParsedExpression::Null(span) => span.clone(),
+            ParsedExpression::Number(_, span) => span.clone(),
+            ParsedExpression::Sizeof(_, span) => span.clone(),
+            ParsedExpression::StaticMemberAccess(_, _, span) => span.clone(),
+            ParsedExpression::String(_, span) => span.clone(),
+            ParsedExpression::TernaryOperator(_, _, _, span) => span.clone(),
+            ParsedExpression::UnaryOperation(_, _, span) => span.clone(),
+        }
+    }
 }
 #[derive(Debug, Clone)] pub struct Parser {
     pub tokens: Vec<Token>,
@@ -503,8 +546,8 @@ impl Parser {
             var_type = self.parse_type()?;
         }
         let mut expression: Option<ParsedExpression> = None;
-        if self.tokens[self.index].kind() == TokenKind::Equals {
-            self.expect(TokenKind::Equals)?;
+        if self.tokens[self.index].kind() == TokenKind::Equal {
+            self.expect(TokenKind::Equal)?;
             expression = Some(self.parse_expression()?);
         }
         self.expect(TokenKind::Semicolon)?;
@@ -742,6 +785,11 @@ impl Parser {
             TokenKind::Decrement => {
                 self.index += 1;
                 Ok(ParsedExpression::UnaryOperation(UnaryOperator::Decrement, Box::new(self.parse_unary_expression()?), span))
+            }
+            TokenKind::Sizeof => {
+                self.index += 1;
+                let t: ParsedType = self.parse_type()?;
+                Ok(ParsedExpression::Sizeof(t, span))
             }
             _ => self.parse_postfix_expression(),
         }

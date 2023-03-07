@@ -105,6 +105,7 @@ impl OnyxLexer {
                             "public" => TokenKind::Public,
                             "raw" => TokenKind::Raw,
                             "return" => TokenKind::Return,
+                            "sizeof" => TokenKind::Sizeof,
                             "var" => TokenKind::Var,
                             "virtual" => TokenKind::Virtual,
                             "weak" => TokenKind::Weak,
