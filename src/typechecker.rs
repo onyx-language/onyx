@@ -70,6 +70,7 @@ impl Type {
     Class(CheckedClass),
     VariableDeclaration(CheckedVariable),
     Expression(CheckedExpression),
+    Return(CheckedExpression, Span),
 }
 #[derive(Debug, Clone)] pub struct CheckedClass {
     pub name: String,
@@ -115,9 +116,11 @@ impl Type {
     String(String, Span),
     Sizeof(Type, Span),
     Identifier(String, Span),
+    Null(Span),
     MemberAccess(Box<CheckedExpression>, Box<CheckedExpression>, Span),
+    StaticMemberAccess(Box<CheckedExpression>, Box<CheckedExpression>, Span),
     Assignment(Box<CheckedExpression>, Box<CheckedExpression>, Span),
-    Call(Box<CheckedExpression>, Vec<CheckedExpression>, Span),
+    Call(Box<CheckedExpression>, Vec<CheckedExpression>, Vec<(Type, Span)>, Span),
 }
 impl CheckedExpression {
     pub fn span(&self) -> Span {
@@ -137,9 +140,11 @@ impl CheckedExpression {
             CheckedExpression::String(_, span) => span.clone(),
             CheckedExpression::Sizeof(_, span) => span.clone(),
             CheckedExpression::Identifier(_, span) => span.clone(),
+            CheckedExpression::Null(span) => span.clone(),
             CheckedExpression::MemberAccess(_, _, span) => span.clone(),
+            CheckedExpression::StaticMemberAccess(_, _, span) => span.clone(),
             CheckedExpression::Assignment(_, _, span) => span.clone(),
-            CheckedExpression::Call(_, _, span) => span.clone(),
+            CheckedExpression::Call(_, _, _, span) => span.clone(),
         }
     }
 }
@@ -411,6 +416,13 @@ impl Typechecker {
                 let checked_expression: CheckedExpression = self.typecheck_expression(expression)?;
                 Ok(CheckedStatement::Expression(checked_expression))
             }
+            ParsedStatement::Return(return_statement, span) => {
+                let checked_expression: CheckedExpression = match return_statement {
+                    Some(expression) => self.typecheck_expression(expression)?,
+                    None => CheckedExpression::Null(span.clone()),
+                };
+                Ok(CheckedStatement::Return(checked_expression, span))
+            }
             _ => Err(OnyxError::TypeError(format!("unimplemented: {:?}", statement), statement.span())),
         }
     }
@@ -451,13 +463,19 @@ impl Typechecker {
                 // TODO: check if left is assignable to right
                 Ok(CheckedExpression::Assignment(Box::new(checked_left), Box::new(checked_right), span))
             }
-            ParsedExpression::Call(callee, arguments, span) => {
+            ParsedExpression::Call(callee, arguments, generic_parameters, span) => {
                 let checked_callee: CheckedExpression = self.typecheck_expression(*callee)?;
                 let mut checked_arguments: Vec<CheckedExpression> = vec![];
+                let mut checked_generic_parameters: Vec<(Type, Span)> = self.typecheck_generic_parameters(generic_parameters)?;
                 for argument in arguments {
                     checked_arguments.push(self.typecheck_expression(argument.1)?);
                 }
-                Ok(CheckedExpression::Call(Box::new(checked_callee), checked_arguments, span))
+                Ok(CheckedExpression::Call(Box::new(checked_callee), checked_arguments, checked_generic_parameters, span))
+            }
+            ParsedExpression::StaticMemberAccess(expression, member, span) => {
+                let checked_expression: CheckedExpression = self.typecheck_expression(*expression)?;
+                let checked_member: CheckedExpression = self.typecheck_expression(*member)?;
+                Ok(CheckedExpression::StaticMemberAccess(Box::new(checked_expression), Box::new(checked_member), span))
             }
             _ => Err(OnyxError::TypeError(format!("unimplemented: {:?}", expression), expression.span()))
         }

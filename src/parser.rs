@@ -189,7 +189,7 @@ impl ParsedBlock {
     Assignment(Box<ParsedExpression>, Box<ParsedExpression>, Span),
     BinaryOperation(Box<ParsedExpression>, BinaryOperator, Box<ParsedExpression>, Span),
     Boolean(bool, Span),
-    Call(Box<ParsedExpression>, Vec<(Option<String>, ParsedExpression)>, Span),
+    Call(Box<ParsedExpression>, Vec<(Option<String>, ParsedExpression)>, Vec<(String, Span)>, Span),
     Character(char, Span),
     FloatingPoint(f64, Span),
     Identifier(String, Span),
@@ -210,7 +210,7 @@ impl ParsedExpression {
             ParsedExpression::Assignment(_, _, span) => span.clone(),
             ParsedExpression::BinaryOperation(_, _, _, span) => span.clone(),
             ParsedExpression::Boolean(_, span) => span.clone(),
-            ParsedExpression::Call(_, _, span) => span.clone(),
+            ParsedExpression::Call(_, _, _, span) => span.clone(),
             ParsedExpression::Character(_, span) => span.clone(),
             ParsedExpression::FloatingPoint(_, span) => span.clone(),
             ParsedExpression::Identifier(_, span) => span.clone(),
@@ -610,7 +610,7 @@ impl Parser {
     }
     fn parse_assignment_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
         let span: Span = self.span();
-        let mut expression: ParsedExpression = self.parse_call_expression()?;
+        let mut expression: ParsedExpression = self.parse_equality_expression()?;
         loop {
             match self.tokens[self.index].kind() {
                 TokenKind::Equal => {
@@ -642,8 +642,50 @@ impl Parser {
         }
         Ok(expression)
     }
+    fn parse_equality_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
+        let mut expression: ParsedExpression = self.parse_comparison_expression()?;
+        loop {
+            match self.tokens[self.index].kind() {
+                TokenKind::Equals => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::Equal, Box::new(self.parse_expression()?), self.span());
+                }
+                TokenKind::NotEqual => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::NotEqual, Box::new(self.parse_expression()?), self.span());
+                }
+                _ => break,
+            }
+        }
+        Ok(expression)
+    }
+    fn parse_comparison_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
+        let mut expression: ParsedExpression = self.parse_call_expression()?;
+        loop {
+            match self.tokens[self.index].kind() {
+                TokenKind::LessThan => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::LessThan, Box::new(self.parse_expression()?), self.span());
+                }
+                TokenKind::LessThanOrEqual => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::LessThanOrEqual, Box::new(self.parse_expression()?), self.span());
+                }
+                TokenKind::GreaterThan => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::GreaterThan, Box::new(self.parse_expression()?), self.span());
+                }
+                TokenKind::GreaterThanOrEqual => {
+                    self.index += 1;
+                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::GreaterThanOrEqual, Box::new(self.parse_expression()?), self.span());
+                }
+                _ => break,
+            }
+        }
+        Ok(expression)
+    }
     fn parse_call_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
-        let mut expression: ParsedExpression = self.parse_equality_expression()?;
+        let mut expression: ParsedExpression = self.parse_additive_expression()?;
         loop {
             match self.tokens[self.index].kind() {
                 TokenKind::LeftParen => {
@@ -664,49 +706,39 @@ impl Parser {
                         }
                     }
                     self.expect(TokenKind::RightParen)?;
-                    expression = ParsedExpression::Call(Box::new(expression), arguments, self.span());
+                    expression = ParsedExpression::Call(Box::new(expression), arguments, vec![], self.span());
                 }
-                _ => break,
-            }
-        }
-        Ok(expression)
-    }
-    fn parse_equality_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
-        let mut expression: ParsedExpression = self.parse_comparison_expression()?;
-        loop {
-            match self.tokens[self.index].kind() {
-                TokenKind::Equals => {
-                    self.index += 1;
-                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::Equal, Box::new(self.parse_expression()?), self.span());
-                }
-                TokenKind::NotEqual => {
-                    self.index += 1;
-                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::NotEqual, Box::new(self.parse_expression()?), self.span());
-                }
-                _ => break,
-            }
-        }
-        Ok(expression)
-    }
-    fn parse_comparison_expression(&mut self) -> Result<ParsedExpression, OnyxError> {
-        let mut expression: ParsedExpression = self.parse_additive_expression()?;
-        loop {
-            match self.tokens[self.index].kind() {
                 TokenKind::LessThan => {
-                    self.index += 1;
-                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::LessThan, Box::new(self.parse_expression()?), self.span());
-                }
-                TokenKind::LessThanOrEqual => {
-                    self.index += 1;
-                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::LessThanOrEqual, Box::new(self.parse_expression()?), self.span());
-                }
-                TokenKind::GreaterThan => {
-                    self.index += 1;
-                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::GreaterThan, Box::new(self.parse_expression()?), self.span());
-                }
-                TokenKind::GreaterThanOrEqual => {
-                    self.index += 1;
-                    expression = ParsedExpression::BinaryOperation(Box::new(expression), BinaryOperator::GreaterThanOrEqual, Box::new(self.parse_expression()?), self.span());
+                    if self.tokens[self.index + 2].kind() == TokenKind::GreaterThan || self.tokens[self.index + 2].kind() == TokenKind::Comma {
+                        self.index += 1;
+                        let mut generic_arguments: Vec<(String, Span)> = vec![];
+                        while self.tokens[self.index].kind() != TokenKind::GreaterThan {
+                            let name: String = self.parse_identifier()?;
+                            generic_arguments.push((name, self.span()));
+                            if self.tokens[self.index].kind() == TokenKind::Comma {
+                                self.expect(TokenKind::Comma)?;
+                            }
+                        }
+                        self.expect(TokenKind::GreaterThan)?;
+                        self.expect(TokenKind::LeftParen)?;
+                        let mut arguments: Vec<(Option<String>, ParsedExpression)> = vec![];
+                        while self.tokens[self.index].kind() != TokenKind::RightParen {
+                            if self.tokens[self.index + 1].kind() == TokenKind::Colon {
+                                let name: String = self.parse_identifier()?;
+                                self.expect(TokenKind::Colon)?;
+                                let argument: ParsedExpression = self.parse_expression()?;
+                                arguments.push((Some(name), argument));
+                            } else {
+                                let argument: ParsedExpression = self.parse_expression()?;
+                                arguments.push((None, argument));
+                            }
+                            if self.tokens[self.index].kind() == TokenKind::Comma {
+                                self.expect(TokenKind::Comma)?;
+                            }
+                        }
+                        self.expect(TokenKind::RightParen)?;
+                        expression = ParsedExpression::Call(Box::new(expression), arguments, generic_arguments, self.span());   
+                    }
                 }
                 _ => break,
             }

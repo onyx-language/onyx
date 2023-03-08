@@ -18,12 +18,15 @@ pub trait Codegen {
     fn codegen_method(&mut self, method: CheckedMethod) -> Result<(), OnyxError>;
     fn codegen_expression(&mut self, expression: CheckedExpression) -> Result<(), OnyxError>;
     fn codegen_type(&mut self, t: Type) -> Result<(), OnyxError>;
+    fn codegen_type_to_string(&mut self, t: Type) -> Result<String, OnyxError>;
     fn codegen_block(&mut self, block: CheckedBlock) -> Result<(), OnyxError>;
     fn codegen_parameter(&mut self, parameter: CheckedParameter) -> Result<(), OnyxError>;
     fn codegen_body(&mut self, block: CheckedBody) -> Result<(), OnyxError>;
 
     fn write(&mut self, s: &str) -> ();
     fn writeln(&mut self, s: &str) -> ();
+    fn write_to_header(&mut self, s: &str) -> ();
+    fn writeln_to_header(&mut self, s: &str) -> ();
 }
 
 #[derive(Debug, Clone)] pub struct CppCodegen {
@@ -58,8 +61,9 @@ impl CppCodegen {
     }
 
     pub fn codegen(&mut self, ast: &CheckedAST) -> Result<String, OnyxError> {
-        self.output.push_str("#include <variant>\n");
-        self.output.push_str(format!("#include \"{}\"\n", self.filename.replace(".onyx", ".hpp")).as_str());
+        self.header.push_str("#include <variant>\n");
+        let filename: String = self.filename.clone() + ".hpp";
+        self.output.push_str(format!("#include \"{}\"\n", filename).as_str());
         Ok(self.codegen_ast(ast.clone())?)
     }
 }
@@ -99,99 +103,105 @@ impl Codegen for CppCodegen {
                                 ()
                             }
                             CheckedEnumVariant::Unit(name, _) => {
-                                self.write("struct ");
-                                self.write(&name);
-                                self.writeln(" {};");
+                                self.write_to_header("struct ");
+                                self.write_to_header(&name);
+                                self.writeln_to_header(" {};");
                             }
                             CheckedEnumVariant::Struct(name, _, fields) => {
                                 for field in fields {
                                     if let Type::Unknown(name) = field.1.clone() {
                                         if enum_.generic_parameters.iter().any(|x| x.0 == name) {
-                                            self.write("template<");
+                                            self.write_to_header("template<");
+                                            let mut index: usize = 0;
                                             for (i, parameter) in enum_.generic_parameters.iter().enumerate() {
                                                 if name != parameter.0 {
                                                     continue;
                                                 }
-                                                self.write("typename ");
-                                                self.write(&parameter.0);
-                                                self.write(", ");
+                                                self.write_to_header("typename ");
+                                                self.write_to_header(&parameter.0);
+                                                index += 1;
+                                                if index != enum_.generic_parameters.len() - 1 {
+                                                    self.write_to_header(", ");
+                                                }
                                             }
-                                            self.output.pop();
-                                            self.output.pop();
-                                            self.write("> ");
+                                            self.write_to_header("> ");
                                         }
                                     }
                                 }
-                                self.write("struct ");
-                                self.write(&name);
-                                self.write(" {");
+                                self.write_to_header("struct ");
+                                self.write_to_header(&name);
+                                self.write_to_header(" {");
                                 for (i, field) in fields.iter().enumerate() {
-                                    self.codegen_type(field.1.clone())?;
-                                    self.write(" ");
-                                    self.write(&field.0);
+                                    let t: String = self.codegen_type_to_string(field.1.clone())?;
+                                    self.write_to_header(t.as_str());
+                                    self.write_to_header(" ");
+                                    self.write_to_header(&field.0);
                                     if i != fields.len() - 1 {
-                                        self.write(", ");
+                                        self.write_to_header(", ");
                                     }
                                 }
-                                self.writeln("};");
+                                self.writeln_to_header("};");
                             }
                         }   
                     }
 
                     if enum_.generic_parameters.len() > 0 {
-                        self.write("template<");
+                        self.write_to_header("template<");
                         for (i, parameter) in enum_.generic_parameters.iter().enumerate() {
-                            self.write("typename ");
-                            self.write(&parameter.0);
+                            self.write_to_header("typename ");
+                            self.write_to_header(&parameter.0);
                             if i != enum_.generic_parameters.len() - 1 {
-                                self.write(", ");
+                                self.write_to_header(", ");
                             }
                         }
-                        self.writeln(">");
+                        self.writeln_to_header(">");
                     }
-                    self.write("using ");
-                    self.write(&enum_.name);
-                    self.write(" = std::variant<");
+                    self.write_to_header("using ");
+                    self.write_to_header(&enum_.name);
+                    self.write_to_header(" = std::variant<");
                     for (i, variant) in enum_.variants.iter().enumerate() {
                         match variant {
                             CheckedEnumVariant::Tuple(name, _, types) => {
-                                self.write("std::tuple<");
+                                self.write_to_header("std::tuple<");
                                 for (i, t) in types.iter().enumerate() {
-                                    self.codegen_type(t.0.clone())?;
+                                    let t: String = self.codegen_type_to_string(t.0.clone())?;
+                                    self.write_to_header(&t);
                                     if i != types.len() - 1 {
-                                        self.write(", ");
+                                        self.write_to_header(", ");
                                     }
                                 }
-                                self.write(">");
+                                self.write_to_header(">");
                             }
                             CheckedEnumVariant::Unit(name, _) => {
-                                self.write(&name);
+                                self.write_to_header(&name);
                             }
                             CheckedEnumVariant::Struct(name, _, fields) => {
-                                self.write(&name);
-                                self.write("<");
+                                self.write_to_header(&name);
+                                self.write_to_header("<");
                                 for (i, field) in fields.iter().enumerate() {
                                     if let Type::Unknown(name) = field.1.clone() {
                                         if enum_.generic_parameters.iter().any(|x| x.0 == name) {
-                                            self.write(&name);
+                                            self.write_to_header(&name);
                                         } else {
-                                            self.codegen_type(field.1.clone())?;
+                                            let t: String = self.codegen_type_to_string(field.1.clone())?;
+                                            self.write_to_header(&t);
                                         }
                                     } else {
-                                        self.codegen_type(field.1.clone())?;
+                                        let t: String = self.codegen_type_to_string(field.1.clone())?;
+                                        self.write_to_header(&t);
                                     }
                                     if i != fields.len() - 1 {
-                                        self.write(", ");
+                                        self.write_to_header(", ");
                                     }
                                 }
-                                self.write(">");
+                                self.write_to_header(">");
                             }
                         }
                         if i != enum_.variants.len() - 1 {
-                            self.write(", ");
+                            self.write_to_header(", ");
                         }
                     }
-                    self.writeln(">;");
+                    self.writeln_to_header(">;");
                     self.enums.push(enum_.name.clone());
                 }
             }
@@ -258,6 +268,11 @@ impl Codegen for CppCodegen {
                 self.codegen_expression(expression)?;
                 self.writeln(";");
             }
+            CheckedStatement::Return(expression, _) => {
+                self.write("return ");
+                self.codegen_expression(expression)?;
+                self.writeln(";");
+            }
             _ => {}
         }
         Ok(())
@@ -299,8 +314,18 @@ impl Codegen for CppCodegen {
                 self.write(" = ");
                 self.codegen_expression(*right)?;
             }
-            CheckedExpression::Call(name, parameters, _) => {
+            CheckedExpression::Call(name, parameters, generic_parameters, _) => {
                 self.codegen_expression(*name)?;
+                if generic_parameters.len() > 0 {
+                    self.write("<");
+                    for (i, parameter) in generic_parameters.iter().enumerate() {
+                        self.codegen_type(parameter.0.clone())?;
+                        if i != generic_parameters.len() - 1 {
+                            self.write(", ");
+                        }
+                    }
+                    self.write(">");
+                }
                 self.write("(");
                 for (i, parameter) in parameters.iter().enumerate() {
                     self.codegen_expression(parameter.clone())?;
@@ -312,6 +337,54 @@ impl Codegen for CppCodegen {
             }
             CheckedExpression::Identifier(name, _) => {
                 self.write(&name);
+            }
+            CheckedExpression::StaticMemberAccess(expression, member, _) => {
+                match *expression.clone() {
+                    CheckedExpression::Identifier(name, _) => {
+                        if self.enums.contains(&name) {
+                            match *member.clone() {
+                                CheckedExpression::Call(name, parameters, generic_parameters, _) => {
+                                    self.codegen_expression(*name)?;
+                                    if generic_parameters.len() > 0 {
+                                        self.write("<");
+                                        for (i, parameter) in generic_parameters.iter().enumerate() {
+                                            self.codegen_type(parameter.0.clone())?;
+                                            if i != generic_parameters.len() - 1 {
+                                                self.write(", ");
+                                            }
+                                        }
+                                        self.write(">");
+                                    }
+                                    self.write("{");
+                                    for (i, parameter) in parameters.iter().enumerate() {
+                                        self.codegen_expression(parameter.clone())?;
+                                        if i != parameters.len() - 1 {
+                                            self.write(", ");
+                                        }
+                                    }
+                                    self.write("}");
+                                }
+                                _ => {
+                                    self.write(&name);
+                                    self.write("::");
+                                    self.codegen_expression(*member)?;
+                                }
+                            }
+                        } else {
+                            self.write(&name);
+                            self.write("::");
+                            self.codegen_expression(*member)?;
+                        }
+                    }
+                    _ => {
+                        self.codegen_expression(*expression)?;
+                        self.write("::");
+                        self.codegen_expression(*member)?;
+                    }
+                }
+            }
+            CheckedExpression::Integer8(value, _) => {
+                self.write(&value.to_string());
             }
             _ => {}
         }
@@ -366,6 +439,9 @@ impl Codegen for CppCodegen {
             Type::Class(name) | Type::Enum(name) => self.write(&name),
             Type::Generic(name, types) => {
                 self.write(&name);
+                if types.len() == 0 {
+                    return Ok(());
+                }
                 self.write("<");
                 for (i, t) in types.iter().enumerate() {
                     self.codegen_type(t.clone())?;
@@ -378,6 +454,51 @@ impl Codegen for CppCodegen {
             Type::Unknown(name) => self.write(&name),
         }
         Ok(())
+    }
+    fn codegen_type_to_string(&mut self, t: Type) -> Result<String, OnyxError> {
+        match t.clone() {
+            Type::Char => Ok("char".to_string()),
+            Type::Bool => Ok("bool".to_string()),
+            Type::I8 => Ok("int8_t".to_string()),
+            Type::I16 => Ok("int16_t".to_string()),
+            Type::I32 => Ok("int32_t".to_string()),
+            Type::I64 => Ok("int64_t".to_string()),
+            Type::U8 => Ok("uint8_t".to_string()),
+            Type::U16 => Ok("uint16_t".to_string()),
+            Type::U32 => Ok("uint32_t".to_string()),
+            Type::U64 => Ok("uint64_t".to_string()),
+            Type::F32 => Ok("float".to_string()),
+            Type::F64 => Ok("double".to_string()),
+            Type::Usize => Ok("size_t".to_string()),
+            Type::Void => Ok("void".to_string()),
+            Type::Array(t) => Ok(format!("{}*", self.codegen_type_to_string(*t)?)),
+            Type::SizedArray(t, size) => {
+                Ok(format!("{}[{}]", self.codegen_type_to_string(*t)?, size))
+            }
+            Type::Optional(t) => Ok(format!(
+                "std::optional<{}>",
+                self.codegen_type_to_string(*t)?
+            )),
+            Type::RawPtr(t) => Ok(format!("{}*", self.codegen_type_to_string(*t)?)),
+            Type::WeakPtr(t) => Ok(format!(
+                "std::weak_ptr<{}>",
+                self.codegen_type_to_string(*t)?
+            )),
+            Type::Class(name) | Type::Enum(name) => Ok(name),
+            Type::Generic(name, types) => {
+                let mut s = name;
+                s.push('<');
+                for (i, t) in types.iter().enumerate() {
+                    s.push_str(&self.codegen_type_to_string(t.clone())?);
+                    if i != types.len() - 1 {
+                        s.push_str(", ");
+                    }
+                }
+                s.push('>');
+                Ok(s)
+            }
+            Type::Unknown(name) => Ok(name),
+        }
     }
     fn codegen_body(&mut self, block: CheckedBody) -> Result<(), OnyxError> {
         match block {
@@ -404,6 +525,13 @@ impl Codegen for CppCodegen {
     fn writeln(&mut self, s: &str) -> () {
         self.output.push_str(s);
         self.output.push_str("\n");
+    }
+    fn write_to_header(&mut self, s: &str) -> () {
+        self.header.push_str(s);
+    }
+    fn writeln_to_header(&mut self, s: &str) -> () {
+        self.header.push_str(s);
+        self.header.push_str("\n");
     }
 }
 

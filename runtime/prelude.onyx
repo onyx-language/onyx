@@ -6,14 +6,14 @@ enum Result<R, E> {
 class String {
     private var data: [u8];
     private var length: usize;
-    public function create(data: [u8]) -> String {
+    public function create(data: [u8]) -> raw String {
         this.data = data;
-        this.length = length.size();
+        this.length = data.size();
     }
     public function length(this) -> usize => this.length;
 }
 
 
-// function foo() -> Result<i32, [char]> {
-
-// }
+function foo() -> Result<i32, [char]> {
+    return Result::Ok<i32>(42);
+}
