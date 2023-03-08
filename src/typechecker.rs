@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::format};
 use crate::{
     span::Span,
-    parser::{ParsedAST, ParsedFirstClassStatement, ParsedType, ParsedExpression, ParsedBody, ParsedStatement, EnumVariant},
+    parser::{ParsedAST, ParsedFirstClassStatement, ParsedType, ParsedExpression, ParsedBody, ParsedStatement, EnumVariant, Visibility},
     error::OnyxError,
 };
 pub type ScopeId = usize;
@@ -67,8 +67,37 @@ impl Type {
 #[derive(Debug, Clone)] pub enum CheckedStatement {
     Function(CheckedFunction),
     Enum(CheckedEnum),
+    Class(CheckedClass),
     VariableDeclaration(CheckedVariable),
     Expression(CheckedExpression),
+}
+#[derive(Debug, Clone)] pub struct CheckedClass {
+    pub name: String,
+    pub name_span: Span,
+    pub generic_parameters: Vec<(Type, Span)>,
+    pub parent_class: Option<String>,
+    pub parent_generic_parameters: Option<Vec<(Type, Span)>>,
+    pub fields: Vec<CheckedField>,
+    pub methods: Vec<CheckedMethod>,
+}
+#[derive(Debug, Clone)] pub struct CheckedField {
+    pub name: String,
+    pub name_span: Span,
+    pub field_type: Type,
+    pub initializer: Option<CheckedExpression>,
+    pub mutable: bool,
+    pub visibility: Visibility,
+}
+#[derive(Debug, Clone)] pub struct CheckedMethod {
+    pub name: String,
+    pub name_span: Span,
+    pub generic_parameters: Vec<(Type, Span)>,
+    pub parameters: Vec<CheckedParameter>,
+    pub return_type: Type,
+    pub body: CheckedBody,
+    pub visibility: Visibility,
+    pub is_virtual: bool,
+    pub is_override: bool,
 }
 #[derive(Debug, Clone)] pub enum CheckedExpression {
     Integer8(i8, Span),
@@ -83,7 +112,36 @@ impl Type {
     Float64(f64, Span),
     Char(char, Span),
     Bool(bool, Span),
-    Sizeof(Type, Span),    
+    String(String, Span),
+    Sizeof(Type, Span),
+    Identifier(String, Span),
+    MemberAccess(Box<CheckedExpression>, Box<CheckedExpression>, Span),
+    Assignment(Box<CheckedExpression>, Box<CheckedExpression>, Span),
+    Call(Box<CheckedExpression>, Vec<CheckedExpression>, Span),
+}
+impl CheckedExpression {
+    pub fn span(&self) -> Span {
+        match self {
+            CheckedExpression::Integer8(_, span) => span.clone(),
+            CheckedExpression::Integer16(_, span) => span.clone(),
+            CheckedExpression::Integer32(_, span) => span.clone(),
+            CheckedExpression::Integer64(_, span) => span.clone(),
+            CheckedExpression::UnsignedInteger8(_, span) => span.clone(),
+            CheckedExpression::UnsignedInteger16(_, span) => span.clone(),
+            CheckedExpression::UnsignedInteger32(_, span) => span.clone(),
+            CheckedExpression::UnsignedInteger64(_, span) => span.clone(),
+            CheckedExpression::Float32(_, span) => span.clone(),
+            CheckedExpression::Float64(_, span) => span.clone(),
+            CheckedExpression::Char(_, span) => span.clone(),
+            CheckedExpression::Bool(_, span) => span.clone(),
+            CheckedExpression::String(_, span) => span.clone(),
+            CheckedExpression::Sizeof(_, span) => span.clone(),
+            CheckedExpression::Identifier(_, span) => span.clone(),
+            CheckedExpression::MemberAccess(_, _, span) => span.clone(),
+            CheckedExpression::Assignment(_, _, span) => span.clone(),
+            CheckedExpression::Call(_, _, span) => span.clone(),
+        }
+    }
 }
 #[derive(Debug, Clone)] pub struct CheckedVariable {
     pub name: String,
@@ -144,6 +202,7 @@ impl Scope {
     pub ast: ParsedAST,
     pub scopes: HashMap<ScopeId, Scope>,
     pub current_scope: Scope,
+    pub current_class: Option<String>,
     pub current_safety_context: SafetyMode,
 }
 impl Typechecker {
@@ -155,6 +214,7 @@ impl Typechecker {
             ast: ast.clone(),
             scopes,
             current_scope,
+            current_class: None,
             current_safety_context: SafetyMode::Safe,
         }
     }
@@ -183,10 +243,10 @@ impl Typechecker {
                 self.new_scope();
                 let mut parameters: Vec<CheckedParameter> = vec![];
                 for parameter in function.parameters {
-                    let checked_parameter: CheckedParameter = CheckedParameter {
+                    let mut checked_parameter: CheckedParameter = CheckedParameter {
                         name: parameter.name,
                         name_span: parameter.name_span,
-                        parameter_type: self.typecheck_type(parameter.parameter_type)?,
+                        parameter_type: self.typecheck_type(parameter.parameter_type.clone())?,
                         initializer: match parameter.initializer {
                             Some(initializer) => Some(self.typecheck_expression(initializer)?),
                             None => None,
@@ -239,6 +299,79 @@ impl Typechecker {
                 };
                 Ok(CheckedStatement::Enum(checked_enum))
             }
+            ParsedFirstClassStatement::Class(class) => {
+                let mut checked_methods: Vec<CheckedMethod> = vec![];
+                self.current_class = Some(class.name.clone());
+                for method in class.methods {
+                    self.new_scope();
+                    let mut parameters: Vec<CheckedParameter> = vec![];
+                    for parameter in method.base_declaration.parameters {
+                        if parameter.name.clone() == "this".to_string() {
+                            let checked_parameter: CheckedParameter = CheckedParameter {
+                                name: parameter.name.clone(),
+                                name_span: parameter.name_span.clone(),
+                                parameter_type: Type::Class(class.name.clone()),
+                                initializer: None,
+                                is_named: parameter.is_named,
+                            };
+                            parameters.push(checked_parameter);
+                        } else {
+                            let checked_parameter: CheckedParameter = CheckedParameter {
+                                name: parameter.name.clone(),
+                                name_span: parameter.name_span.clone(),
+                                parameter_type: self.typecheck_type(parameter.parameter_type)?,
+                                initializer: match parameter.initializer {
+                                    Some(initializer) => Some(self.typecheck_expression(initializer)?),
+                                    None => None,
+                                },
+                                is_named: parameter.is_named,
+                            };
+                            parameters.push(checked_parameter);
+                        }
+                    }
+                    let checked_method: CheckedMethod = CheckedMethod {
+                        name: method.base_declaration.name,
+                        name_span: method.base_declaration.name_span,
+                        generic_parameters: self.typecheck_generic_parameters(method.base_declaration.generic_parameters)?,
+                        parameters,
+                        return_type: self.typecheck_type(method.base_declaration.return_type)?,
+                        body: self.typecheck_function_body(method.base_declaration.body)?,
+                        is_virtual: method.is_virtual,
+                        is_override: method.is_override,
+                        visibility: method.visibility,
+                    };
+                    self.end_scope();
+                    self.current_class = None;
+                    checked_methods.push(checked_method);
+                }
+                let mut checked_fields: Vec<CheckedField> = vec![];
+                for field in class.fields {
+                    checked_fields.push(CheckedField {
+                        name: field.base_declaration.name,
+                        name_span: field.base_declaration.span,
+                        field_type: self.typecheck_type(field.base_declaration.var_type)?,
+                        initializer: match field.base_declaration.initializer {
+                            Some(initializer) => Some(self.typecheck_expression(initializer)?),
+                            None => None,
+                        },
+                        mutable: field.base_declaration.mutable,
+                        visibility: field.visibility,
+                    });
+                }
+                let checked_class: CheckedClass = CheckedClass {
+                    name: class.name,
+                    name_span: class.name_span,
+                    parent_class: class.parent_class,
+                    parent_generic_parameters: match class.parent_generic_parameters {
+                        Some(parent_generic_parameters) => Some(self.typecheck_generic_parameters(parent_generic_parameters)?),
+                        None => None,
+                    },
+                    generic_parameters: self.typecheck_generic_parameters(class.generic_parameters)?,
+                    methods: checked_methods,
+                    fields: checked_fields,
+                };
+                Ok(CheckedStatement::Class(checked_class))
+            }
             _ => {
                 Err(OnyxError::TypeError("unimplemented".to_string(), statement.span()))
             }
@@ -274,7 +407,11 @@ impl Typechecker {
                 self.current_scope.variables.push(checked_variable.clone());
                 Ok(CheckedStatement::VariableDeclaration(checked_variable))
             }
-            _ => Err(OnyxError::TypeError("unimplemented".to_string(), statement.span()))
+            ParsedStatement::Expression(expression) => {
+                let checked_expression: CheckedExpression = self.typecheck_expression(expression)?;
+                Ok(CheckedStatement::Expression(checked_expression))
+            }
+            _ => Err(OnyxError::TypeError(format!("unimplemented: {:?}", statement), statement.span())),
         }
     }
     fn typecheck_expression(&mut self, expression: ParsedExpression) -> Result<CheckedExpression, OnyxError> {
@@ -299,7 +436,30 @@ impl Typechecker {
                 }
                 Ok(CheckedExpression::Sizeof(checked_type, span))
             }
-            _ => Err(OnyxError::TypeError("unimplemented".to_string(), expression.span()))
+            ParsedExpression::MemberAccess(expression, member, span) => {
+                let checked_expression: CheckedExpression = self.typecheck_expression(*expression)?;
+                let checked_member: CheckedExpression = self.typecheck_expression(*member)?;
+                Ok(CheckedExpression::MemberAccess(Box::new(checked_expression), Box::new(checked_member), span))
+            }
+            ParsedExpression::Identifier(name, span) => {
+                // TODO: check if variable exists
+                Ok(CheckedExpression::Identifier(name, span))
+            }
+            ParsedExpression::Assignment(left, right, span) => {
+                let checked_left: CheckedExpression = self.typecheck_expression(*left)?;
+                let checked_right: CheckedExpression = self.typecheck_expression(*right)?;
+                // TODO: check if left is assignable to right
+                Ok(CheckedExpression::Assignment(Box::new(checked_left), Box::new(checked_right), span))
+            }
+            ParsedExpression::Call(callee, arguments, span) => {
+                let checked_callee: CheckedExpression = self.typecheck_expression(*callee)?;
+                let mut checked_arguments: Vec<CheckedExpression> = vec![];
+                for argument in arguments {
+                    checked_arguments.push(self.typecheck_expression(argument.1)?);
+                }
+                Ok(CheckedExpression::Call(Box::new(checked_callee), checked_arguments, span))
+            }
+            _ => Err(OnyxError::TypeError(format!("unimplemented: {:?}", expression), expression.span()))
         }
     }
     fn typecheck_function_body(&mut self, body: ParsedBody) -> Result<CheckedBody, OnyxError> {
@@ -376,7 +536,9 @@ impl Typechecker {
             CheckedExpression::Float64(float, _) => Ok(Type::F64),
             CheckedExpression::Char(character, _) => Ok(Type::Char),
             CheckedExpression::Bool(boolean, _) => Ok(Type::Bool),
+            CheckedExpression::String(string, _) => Ok(Type::Array(Box::new(Type::Char))),
             CheckedExpression::Sizeof(t, _) => Ok(Type::Usize),
+            _ => Err(OnyxError::TypeError("unknown expression type".to_string(), expression.span()))
         }
     }
     fn new_scope(&mut self) {

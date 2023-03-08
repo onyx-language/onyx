@@ -3,12 +3,17 @@ enum Result<R, E> {
     Err(value: E),
 }
 
-// class String {
-//     private var data: [u8];
-//     private var length: usize;
-//     public function create(data: [u8]) -> String {
-//         this.data = data;
-//         this.length = length.size();
-//     }
-//     public function length(this) -> usize => this.length;
+class String {
+    private var data: [u8];
+    private var length: usize;
+    public function create(data: [u8]) -> String {
+        this.data = data;
+        this.length = length.size();
+    }
+    public function length(this) -> usize => this.length;
+}
+
+
+// function foo() -> Result<i32, [char]> {
+
 // }
