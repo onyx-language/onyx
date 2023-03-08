@@ -8,6 +8,7 @@ pub enum TokenKind {
     Bool(bool),
     Identifier(String),
 
+    Boxed,          // boxed
     Class,          // class
     Const,          // const
     Defer,          // defer

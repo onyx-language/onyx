@@ -45,6 +45,7 @@ impl ParsedType {
     pub name: String,
     pub generic_parameters: Vec<(String, Span)>,
     pub variants: Vec<EnumVariant>,
+    pub is_boxed: bool,
     pub span: Span,
 }
 #[derive(Debug, Clone)] pub struct ParsedVariableDeclaration {
@@ -257,7 +258,18 @@ impl Parser {
     }
     fn parse_first_class_statement(&mut self) -> Result<ParsedFirstClassStatement, OnyxError> {
         match self.tokens[self.index].kind() {
-            TokenKind::Enum => self.parse_enum(),
+            TokenKind::Enum => self.parse_enum(false),
+            TokenKind::Boxed => {
+                self.expect(TokenKind::Boxed)?;
+                match self.tokens[self.index].kind() {
+                    TokenKind::Enum => self.parse_enum(true),
+                    _ => {
+                        let err = OnyxError::SyntaxError(format!("invalid boxed statement: {:?}", self.tokens[self.index].kind()), self.span());
+                        self.index += 1;
+                        Err(err)
+                    }
+                }
+            }
             TokenKind::Function => self.parse_function(),
             TokenKind::Class => self.parse_class(),
             _ => {
@@ -267,7 +279,7 @@ impl Parser {
             }
         }
     }
-    fn parse_enum(&mut self) -> Result<ParsedFirstClassStatement, OnyxError> {
+    fn parse_enum(&mut self, is_boxed: bool) -> Result<ParsedFirstClassStatement, OnyxError> {
         let current_token: Token = self.tokens[self.index].clone();
         self.expect(TokenKind::Enum)?;
         let name: String = self.parse_identifier()?;
@@ -285,6 +297,7 @@ impl Parser {
             name,
             generic_parameters,
             variants,
+            is_boxed,
             span: current_token.span(),
         }))
     }

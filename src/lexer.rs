@@ -91,6 +91,7 @@ impl OnyxLexer {
                         match identifier.as_str() {
                             "true" => TokenKind::Bool(true),
                             "false" => TokenKind::Bool(false),
+                            "boxed" => TokenKind::Boxed,
                             "class" => TokenKind::Class,
                             "const" => TokenKind::Const,
                             "defer" => TokenKind::Defer,
