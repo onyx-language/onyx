@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::{
     span::Span,
-    parser::{ParsedAST, ParsedFirstClassStatement, ParsedType, ParsedExpression, ParsedBody, ParsedStatement},
+    parser::{ParsedAST, ParsedFirstClassStatement, ParsedType, ParsedExpression, ParsedBody, ParsedStatement, EnumVariant},
     error::OnyxError,
 };
 pub type ScopeId = usize;
@@ -64,6 +64,7 @@ impl Type {
 }
 #[derive(Debug, Clone)] pub enum CheckedStatement {
     Function(CheckedFunction),
+    Enum(CheckedEnum),
     VariableDeclaration(CheckedVariable),
     Expression(CheckedExpression),
 }
@@ -100,6 +101,13 @@ impl Type {
 #[derive(Debug, Clone)] pub enum CheckedBody {
     Block(CheckedBlock),
     Expression(CheckedExpression),
+}
+#[derive(Debug, Clone)] pub struct CheckedEnum {
+    pub name: String,
+    pub name_span: Span,
+    pub generic_parameters: Vec<(String, Span)>,
+    pub is_boxed: bool,
+    pub variants: Vec<EnumVariant>,
 }
 #[derive(Debug, Clone)] pub struct CheckedBlock {
     pub statements: Vec<CheckedStatement>,
@@ -191,6 +199,16 @@ impl Typechecker {
                 self.end_scope();
                 self.current_scope.functions.push(checked_function.clone());
                 Ok(CheckedStatement::Function(checked_function))
+            }
+            ParsedFirstClassStatement::Enum(enum_) => {
+                let checked_enum: CheckedEnum = CheckedEnum {
+                    name: enum_.name,
+                    name_span: enum_.span,
+                    generic_parameters: enum_.generic_parameters,
+                    is_boxed: enum_.is_boxed,
+                    variants: enum_.variants,
+                };
+                Ok(CheckedStatement::Enum(checked_enum))
             }
             _ => {
                 Err(OnyxError::TypeError("unimplemented".to_string(), statement.span()))
