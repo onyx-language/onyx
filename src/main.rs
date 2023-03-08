@@ -4,6 +4,7 @@ use onyx::{
     tokens::Token,
     parser::{ Parser, ParsedAST },
     typechecker::{ Typechecker, CheckedAST },
+    codegen::{ CppCodegen, RustCodegen },
 };
 
 fn main() {
@@ -11,7 +12,7 @@ fn main() {
     args.next();
     let file_name: String = args.next().unwrap();
 
-    let mut lexer: OnyxLexer = OnyxLexer::new(file_name).unwrap();
+    let mut lexer: OnyxLexer = OnyxLexer::new(file_name.clone()).unwrap();
     let tokens: Result<Vec<Token>, Vec<OnyxError>> = lexer.lex();
     match tokens {
         Ok(tokens) => {
@@ -26,8 +27,16 @@ fn main() {
                     let checked_ast: Result<CheckedAST, Vec<OnyxError>> = typechecker.typecheck();
                     match checked_ast {
                         Ok(checked_ast) => {
-                            println!("{:?}", checked_ast);
-                            println!("{:#?}", typechecker);
+                            let mut cpp_codegen: CppCodegen = CppCodegen::new(file_name.clone());
+                            let cpp_code: Result<String, OnyxError> = cpp_codegen.codegen(&checked_ast);
+                            match cpp_code {
+                                Ok(cpp_code) => {
+                                    println!("{}", cpp_code);
+                                }
+                                Err(err) => {
+                                    println!("{}", err.to_string());
+                                }
+                            }
                         }
                         Err(errors) => {
                             for error in errors {

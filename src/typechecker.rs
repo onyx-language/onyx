@@ -22,6 +22,7 @@ pub type ScopeId = usize;
     Class(String),
     Enum(String),
     Generic(String, Vec<Type>),
+    Unknown(String),
 }
 impl Type {
     pub fn to_string(&self) -> String {
@@ -56,6 +57,7 @@ impl Type {
                 generics_string.pop();
                 format!("{}<{}>", name, generics_string)
             }
+            Type::Unknown(name) => name.clone(),
         }
     }
 }
@@ -107,7 +109,12 @@ impl Type {
     pub name_span: Span,
     pub generic_parameters: Vec<(String, Span)>,
     pub is_boxed: bool,
-    pub variants: Vec<EnumVariant>,
+    pub variants: Vec<CheckedEnumVariant>,
+}
+#[derive(Debug, Clone)] pub enum CheckedEnumVariant {
+    Unit(String, Span),
+    Tuple(String, Span, Vec<(Type, Span)>),
+    Struct(String, Span, Vec<(String, Type, Span)>),
 }
 #[derive(Debug, Clone)] pub struct CheckedBlock {
     pub statements: Vec<CheckedStatement>,
@@ -201,12 +208,34 @@ impl Typechecker {
                 Ok(CheckedStatement::Function(checked_function))
             }
             ParsedFirstClassStatement::Enum(enum_) => {
+                let mut variants: Vec<CheckedEnumVariant> = vec![];
+                for variant in enum_.variants {
+                    match variant {
+                        EnumVariant::NoValues(name, span) => {
+                            variants.push(CheckedEnumVariant::Unit(name, span));
+                        }
+                        EnumVariant::ValuesNoNamed(name, types, span) => {
+                            let mut checked_types: Vec<(Type, Span)> = vec![];
+                            for type_ in types {
+                                checked_types.push((self.typecheck_type(type_)?, span.clone()));
+                            }
+                            variants.push(CheckedEnumVariant::Tuple(name, span.clone(), checked_types));
+                        }
+                        EnumVariant::ValuesNamed(name, values, span) => {
+                            let mut checked_values: Vec<(String, Type, Span)> = vec![];
+                            for value in values {
+                                checked_values.push((value.0, self.typecheck_type(value.1)?, span.clone()));
+                            }
+                            variants.push(CheckedEnumVariant::Struct(name, span, checked_values));
+                        }
+                    }
+                }
                 let checked_enum: CheckedEnum = CheckedEnum {
                     name: enum_.name,
                     name_span: enum_.span,
                     generic_parameters: enum_.generic_parameters,
                     is_boxed: enum_.is_boxed,
-                    variants: enum_.variants,
+                    variants,
                 };
                 Ok(CheckedStatement::Enum(checked_enum))
             }
@@ -316,7 +345,7 @@ impl Typechecker {
                 "f64" => Ok(Type::F64),
                 "usize" => Ok(Type::Usize),
                 "void" => Ok(Type::Void),
-                _ => Err(OnyxError::TypeError(format!("unknown type {}", string), type_.clone().span())),
+                _ => Ok(Type::Unknown(string.clone())),
             },
             ParsedType::Array(t, _) => Ok(Type::Array(Box::new(self.typecheck_type(*t)?))),
             ParsedType::SizedArray(t, size, _) => Ok(Type::SizedArray(Box::new(self.typecheck_type(*t)?), size)),
