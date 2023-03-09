@@ -99,6 +99,7 @@ impl OnyxLexer {
                             "function" => TokenKind::Function,
                             "match" => TokenKind::Match,
                             "named" => TokenKind::Named,
+                            "new" => TokenKind::New,
                             "null" => TokenKind::Null,
                             "override" => TokenKind::Override,
                             "private" => TokenKind::Private,

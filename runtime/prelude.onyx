@@ -3,17 +3,26 @@ enum Result<R, E> {
     Err(value: E),
 }
 
+class Array<T> {
+    private var m_data: [T];
+    private var m_size: usize;
+    public function create(data: [T]) -> raw Array<T> =>
+        new Array<T>(data, sizeof data);
+}
+
 class String {
-    private var data: [u8];
-    private var length: usize;
-    public function create(data: [u8]) -> raw String {
-        this.data = data;
-        this.length = data.size();
-    }
-    public function length(this) -> usize => this.length;
+    private var m_data: [u8];
+    private var m_length: usize;
+    public function create(data: [u8]) -> raw String =>
+        new String(data, sizeof data);
+    public function length(this) -> usize => this->m_length;
 }
 
 
-function foo() -> Result<i32, [char]> {
+function foo() -> Result<i32, String> {
     return Result::Ok<i32>(42);
+}
+
+function main(argc: i32, argv: raw raw char) -> i32 {
+    return 0;
 }

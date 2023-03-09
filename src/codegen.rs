@@ -7,7 +7,7 @@ use crate::{
         CheckedExpression,
         CheckedBlock,
         CheckedParameter,
-        Type, CheckedAST, CheckedBody, CheckedEnumVariant, CheckedField, CheckedMethod,
+        Type, CheckedAST, CheckedBody, CheckedEnumVariant, CheckedField, CheckedMethod, CheckedClass,
     }, parser::Visibility
 };
 
@@ -15,12 +15,13 @@ pub trait Codegen {
     fn codegen_ast(&mut self, ast: CheckedAST) -> Result<String, OnyxError>;
     fn codegen_statement(&mut self, statement: CheckedStatement) -> Result<(), OnyxError>;
     fn codegen_field(&mut self, field: CheckedField) -> Result<(), OnyxError>;
-    fn codegen_method(&mut self, method: CheckedMethod) -> Result<(), OnyxError>;
+    fn codegen_method(&mut self, method: CheckedMethod, class_name: String) -> Result<(), OnyxError>;
     fn codegen_expression(&mut self, expression: CheckedExpression) -> Result<(), OnyxError>;
     fn codegen_type(&mut self, t: Type) -> Result<(), OnyxError>;
     fn codegen_type_to_string(&mut self, t: Type) -> Result<String, OnyxError>;
     fn codegen_block(&mut self, block: CheckedBlock) -> Result<(), OnyxError>;
     fn codegen_parameter(&mut self, parameter: CheckedParameter) -> Result<(), OnyxError>;
+    fn codegen_parameter_to_string(&mut self, parameter: CheckedParameter) -> Result<String, OnyxError>;
     fn codegen_body(&mut self, block: CheckedBody) -> Result<(), OnyxError>;
 
     fn write(&mut self, s: &str) -> ();
@@ -37,7 +38,7 @@ pub trait Codegen {
     includes: Vec<String>,
 
     functions: Vec<String>,
-    classes: Vec<String>,
+    classes: HashMap<String, CheckedClass>,
     enums: Vec<String>,
 }
 
@@ -55,15 +56,17 @@ impl CppCodegen {
             indent: 0,
             includes: Vec::new(),
             functions: Vec::new(),
-            classes: Vec::new(),
+            classes: HashMap::new(),
             enums: Vec::new(),
         }
     }
 
     pub fn codegen(&mut self, ast: &CheckedAST) -> Result<String, OnyxError> {
+        self.header.push_str("#include <stdint.h>\n");
         self.header.push_str("#include <variant>\n");
-        let filename: String = self.filename.clone() + ".hpp";
-        self.output.push_str(format!("#include \"{}\"\n", filename).as_str());
+        self.output.push_str("#include <stdint.h>\n");
+        let filename: String = self.filename.clone().split("/").last().unwrap().to_string();
+        self.output.push_str(format!("#include \"{}.hpp\"\n", filename).as_str());
         Ok(self.codegen_ast(ast.clone())?)
     }
 }
@@ -136,9 +139,7 @@ impl Codegen for CppCodegen {
                                     self.write_to_header(t.as_str());
                                     self.write_to_header(" ");
                                     self.write_to_header(&field.0);
-                                    if i != fields.len() - 1 {
-                                        self.write_to_header(", ");
-                                    }
+                                    self.write_to_header(";");
                                 }
                                 self.writeln_to_header("};");
                             }
@@ -206,9 +207,21 @@ impl Codegen for CppCodegen {
                 }
             }
             CheckedStatement::Class(class) => {
-                self.write("class ");
-                self.write(&class.name);
-                self.write(" {\n");
+                self.classes.insert(class.name.clone(), class.clone());
+                if class.generic_parameters.len() > 0 {
+                    self.write_to_header("template<");
+                    for (i, parameter) in class.generic_parameters.iter().enumerate() {
+                        self.write_to_header("typename ");
+                        self.write_to_header(&self.clone().codegen_type_to_string(parameter.0.clone())?);
+                        if i != class.generic_parameters.len() - 1 {
+                            self.write_to_header(", ");
+                        }
+                    }
+                    self.writeln_to_header(">");
+                }
+                self.write_to_header("class ");
+                self.write_to_header(&class.name);
+                self.write_to_header(" {\n");
                 let mut public_fields: Vec<CheckedField> = Vec::new();
                 let mut private_fields: Vec<CheckedField> = Vec::new();
                 let mut protected_fields: Vec<CheckedField> = Vec::new();
@@ -230,39 +243,84 @@ impl Codegen for CppCodegen {
                     }
                 }
                 if public_fields.len() > 0 || public_methods.len() > 0 {
-                    self.writeln("public:");
+                    self.writeln_to_header("public:");
                     self.indent += 1;
+                    self.write_to_header("~");
+                    self.write_to_header(&class.name);
+                    if class.generic_parameters.len() > 0 {
+                        self.write_to_header("<");
+                        for (i, parameter) in class.generic_parameters.iter().enumerate() {
+                            self.write_to_header(&self.clone().codegen_type_to_string(parameter.0.clone())?);
+                            if i != class.generic_parameters.len() - 1 {
+                                self.write_to_header(", ");
+                            }
+                        }
+                        self.write_to_header(">");
+                    }
+                    self.writeln_to_header("() {}");
                     for field in public_fields {
                         self.codegen_field(field)?;
                     }
                     for method in public_methods {
-                        self.codegen_method(method)?;
+                        self.codegen_method(method, class.name.clone())?;
                     }
                     self.indent -= 1;
                 }
                 if private_fields.len() > 0 || private_methods.len() > 0 {
-                    self.writeln("private:");
+                    self.writeln_to_header("private:");
                     self.indent += 1;
+                    // constructor
+                    self.write_to_header(&class.name);
+                    if class.generic_parameters.len() > 0 {
+                        self.write_to_header("<");
+                        for (i, parameter) in class.generic_parameters.iter().enumerate() {
+                            self.write_to_header(&self.clone().codegen_type_to_string(parameter.0.clone())?);
+                            if i != class.generic_parameters.len() - 1 {
+                                self.write_to_header(", ");
+                            }
+                        }
+                        self.write_to_header(">");
+                    }
+                    self.write_to_header("(");
+                    for (i, field) in class.fields.iter().enumerate() {
+                        self.write_to_header(&self.clone().codegen_type_to_string(field.field_type.clone())?);
+                        self.write_to_header(" ");
+                        self.write_to_header(&field.name);
+                        if i != class.fields.len() - 1 {
+                            self.write_to_header(", ");
+                        }
+                    }
+                    self.write_to_header(") : ");
+                    for (i, field) in class.fields.iter().enumerate() {
+                        self.write_to_header(&field.name);
+                        self.write_to_header("(");
+                        self.write_to_header(&field.name);
+                        self.write_to_header(")");
+                        if i != class.fields.len() - 1 {
+                            self.write_to_header(", ");
+                        }
+                    }
+                    self.writeln_to_header(" {}");
                     for field in private_fields {
                         self.codegen_field(field)?;
                     }
                     for method in private_methods {
-                        self.codegen_method(method)?;
+                        self.codegen_method(method, class.name.clone())?;
                     }
                     self.indent -= 1;
                 }
                 if protected_fields.len() > 0 || protected_methods.len() > 0 {
-                    self.writeln("protected:");
+                    self.writeln_to_header("protected:");
                     self.indent += 1;
                     for field in protected_fields {
                         self.codegen_field(field)?;
                     }
                     for method in protected_methods {
-                        self.codegen_method(method)?;
+                        self.codegen_method(method, class.name.clone())?;
                     }
                     self.indent -= 1;
                 }
-                self.writeln("};");
+                self.writeln_to_header("};");
             }
             CheckedStatement::Expression(expression) => {
                 self.codegen_expression(expression)?;
@@ -278,15 +336,56 @@ impl Codegen for CppCodegen {
         Ok(())
     }
     fn codegen_field(&mut self, field: CheckedField) -> Result<(), OnyxError> {
-        self.codegen_type(field.field_type.clone())?;
-        self.write(" ");
-        self.write(&field.name);
-        self.writeln(";");
+        self.write_to_header(&self.clone().codegen_type_to_string(field.field_type.clone())?);
+        self.write_to_header(" ");
+        self.write_to_header(&field.name);
+        self.writeln_to_header(";");
         Ok(())
     }
-    fn codegen_method(&mut self, method: CheckedMethod) -> Result<(), OnyxError> {
+    fn codegen_method(&mut self, method: CheckedMethod, class_name: String) -> Result<(), OnyxError> {
+        let class: CheckedClass = self.clone().classes.get(&class_name).unwrap().clone();
+        if method.is_static() {
+            self.write_to_header("static ");
+        }
+        self.write_to_header(&self.clone().codegen_type_to_string(method.return_type.clone())?);
+        self.write_to_header(" ");
+        self.write_to_header(&method.name);
+        self.write_to_header("(");
+        for (i, parameter) in method.parameters.iter().enumerate() {
+            if parameter.name == "this" {
+                continue;
+            }
+            self.write_to_header(&self.clone().codegen_parameter_to_string(parameter.clone())?);
+            if i != method.parameters.len() - 1 {
+                self.write_to_header(", ");
+            }
+        }
+        self.writeln_to_header(");");
+        if class.generic_parameters.len() > 0 {
+            self.write("template<");
+            for (i, parameter) in class.generic_parameters.iter().enumerate() {
+                self.write("typename ");
+                self.write(&self.clone().codegen_type_to_string(parameter.0.clone())?);
+                if i != class.generic_parameters.len() - 1 {
+                    self.write(", ");
+                }
+            }
+            self.writeln(">");
+        }
         self.codegen_type(method.return_type.clone())?;
         self.write(" ");
+        self.write(&class_name);
+        if class.generic_parameters.len() > 0 {
+            self.write("<");
+            for (i, parameter) in class.generic_parameters.iter().enumerate() {
+                self.write(&self.clone().codegen_type_to_string(parameter.0.clone())?);
+                if i != class.generic_parameters.len() - 1 {
+                    self.write(", ");
+                }
+            }
+            self.write(">");
+        }
+        self.write("::");
         self.write(&method.name);
         self.write("(");
         for (i, parameter) in method.parameters.iter().enumerate() {
@@ -383,8 +482,22 @@ impl Codegen for CppCodegen {
                     }
                 }
             }
+            CheckedExpression::PointerAccess(expression, member, _) => {
+                self.codegen_expression(*expression)?;
+                self.write("->");
+                self.codegen_expression(*member)?;
+            }
             CheckedExpression::Integer8(value, _) => {
                 self.write(&value.to_string());
+            }
+            CheckedExpression::Sizeof(t, _) => {
+                self.write("sizeof(");
+                self.codegen_type(t.clone())?;
+                self.write(")");
+            }
+            CheckedExpression::New(expression, _) => {
+                self.write("new ");
+                self.codegen_expression(*expression)?;
             }
             _ => {}
         }
@@ -394,7 +507,20 @@ impl Codegen for CppCodegen {
         Ok(())
     }
     fn codegen_parameter(&mut self, parameter: CheckedParameter) -> Result<(), OnyxError> {
+        if parameter.name.clone() == "this" {
+            return Ok(());
+        }
+        self.codegen_type(parameter.parameter_type.clone())?;
+        self.write(" ");
+        self.write(&parameter.name);
         Ok(())
+    }
+    fn codegen_parameter_to_string(&mut self, parameter: CheckedParameter) -> Result<String, OnyxError> {
+        let mut result = String::new();
+        result.push_str(&self.clone().codegen_type_to_string(parameter.parameter_type.clone())?);
+        result.push_str(" ");
+        result.push_str(&parameter.name);
+        Ok(result)
     }
     fn codegen_type(&mut self, t: Type) -> Result<(), OnyxError> {
         match t.clone() {
@@ -437,8 +563,8 @@ impl Codegen for CppCodegen {
                 self.write(">");
             }
             Type::Class(name) | Type::Enum(name) => self.write(&name),
-            Type::Generic(name, types) => {
-                self.write(&name);
+            Type::Generic(t, types) => {
+                self.codegen_type(*t)?;
                 if types.len() == 0 {
                     return Ok(());
                 }
@@ -485,8 +611,8 @@ impl Codegen for CppCodegen {
                 self.codegen_type_to_string(*t)?
             )),
             Type::Class(name) | Type::Enum(name) => Ok(name),
-            Type::Generic(name, types) => {
-                let mut s = name;
+            Type::Generic(t, types) => {
+                let mut s: String = self.codegen_type_to_string(*t)?;
                 s.push('<');
                 for (i, t) in types.iter().enumerate() {
                     s.push_str(&self.codegen_type_to_string(t.clone())?);

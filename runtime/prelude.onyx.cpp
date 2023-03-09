@@ -1,19 +1,18 @@
-#include "runtime/prelude.onyx.hpp"
-class String {
-public:
-String* create() {
-{
-this.data = data;
-this.length = data.size();
+#include <stdint.h>
+#include "prelude.onyx.hpp"
+template<typename T>
+Array<T>* Array<T>::create(T* data) {
+return new Array<T>(data, sizeof(data));
 }
+String* String::create(uint8_t* data) {
+return new String(data, sizeof(data));
 }
-size_t length() {
-return this.length;
+size_t String::length() {
+return this->m_length;
 }
-private:
-uint8_t* data;
-size_t length;
-};
-Result<int32_t, char*> foo(){
-return Ok<i32>{42};
+Result<int32_t, String> foo(){
+return Ok<int32_t>{42};
+}
+int32_t main(int32_t argc, char** argv){
+return 0;
 }

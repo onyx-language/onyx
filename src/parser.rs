@@ -1,7 +1,7 @@
 use crate::{
     tokens::{Token, TokenKind},
     span::Span,
-    error::OnyxError
+    error::OnyxError, typechecker::CheckedExpression
 };
 #[derive(Debug, Clone, PartialEq)] pub enum Visibility {
     Public,
@@ -13,7 +13,7 @@ use crate::{
 }
 #[derive(Debug, Clone, PartialEq)] pub enum ParsedType {
     Name(String, Span),
-    GenericType(String, Vec<ParsedType>, Span),
+    GenericType(Box<ParsedType>, Vec<ParsedType>, Span),
     Array(Box<ParsedType>, Span),
     SizedArray(Box<ParsedType>, usize, Span),
     Optional(Box<ParsedType>, Span),
@@ -195,8 +195,10 @@ impl ParsedBlock {
     Identifier(String, Span),
     Match(Box<ParsedExpression>, Vec<MatchCase>, Span),
     MemberAccess(Box<ParsedExpression>, Box<ParsedExpression>, Span),
+    New(Box<ParsedExpression>, Span),
     Null(Span),
     Number(i64, Span),
+    PointerAccess(Box<ParsedExpression>, Box<ParsedExpression>, Span),
     Sizeof(ParsedType, Span),
     StaticMemberAccess(Box<ParsedExpression>, Box<ParsedExpression>, Span),
     String(String, Span),
@@ -216,8 +218,10 @@ impl ParsedExpression {
             ParsedExpression::Identifier(_, span) => span.clone(),
             ParsedExpression::Match(_, _, span) => span.clone(),
             ParsedExpression::MemberAccess(_, _, span) => span.clone(),
+            ParsedExpression::New(_, span) => span.clone(),
             ParsedExpression::Null(span) => span.clone(),
             ParsedExpression::Number(_, span) => span.clone(),
+            ParsedExpression::PointerAccess(_, _, span) => span.clone(),
             ParsedExpression::Sizeof(_, span) => span.clone(),
             ParsedExpression::StaticMemberAccess(_, _, span) => span.clone(),
             ParsedExpression::String(_, span) => span.clone(),
@@ -836,6 +840,11 @@ impl Parser {
                 let t: ParsedType = self.parse_type()?;
                 Ok(ParsedExpression::Sizeof(t, span))
             }
+            TokenKind::New => {
+                self.index += 1;
+                let expression: ParsedExpression = self.parse_expression()?;
+                Ok(ParsedExpression::New(Box::new(expression), span))
+            }
             _ => self.parse_postfix_expression(),
         }
     }
@@ -851,6 +860,10 @@ impl Parser {
                 TokenKind::StaticAccess => {
                     self.expect(TokenKind::StaticAccess)?;
                     expression = ParsedExpression::StaticMemberAccess(Box::new(expression), Box::new(self.parse_expression()?), span.clone());
+                }
+                TokenKind::Arrow => {
+                    self.expect(TokenKind::Arrow)?;
+                    expression = ParsedExpression::PointerAccess(Box::new(expression), Box::new(self.parse_expression()?), span.clone());
                 }
                 TokenKind::Increment => {
                     self.index += 1;
@@ -994,6 +1007,7 @@ impl Parser {
         let current_token: Token = self.tokens[self.index].clone();
         match current_token.kind() {
             TokenKind::Identifier(identifier) => {
+                let t: ParsedType = ParsedType::Name(identifier.clone(), current_token.span());
                 self.index += 1;
                 if self.tokens[self.index].kind() == TokenKind::LessThan {
                     self.expect(TokenKind::LessThan)?;
@@ -1006,7 +1020,7 @@ impl Parser {
                         }
                     }
                     self.expect(TokenKind::GreaterThan)?;
-                    parsed_type = ParsedType::GenericType(identifier, generic_types, current_token.span());
+                    parsed_type = ParsedType::GenericType(Box::new(t), generic_types, current_token.span());
                 } else {
                     parsed_type = ParsedType::Name(identifier, current_token.span());
                 }

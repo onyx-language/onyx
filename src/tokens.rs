@@ -16,6 +16,7 @@ pub enum TokenKind {
     Function,       // function
     Match,          // match
     Named,          // named
+    New,            // new
     Null,           // null
     Override,       // override
     Public,         // public

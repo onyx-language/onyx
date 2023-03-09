@@ -21,7 +21,7 @@ pub type ScopeId = usize;
     WeakPtr(Box<Type>),
     Class(String),
     Enum(String),
-    Generic(String, Vec<Type>),
+    Generic(Box<Type>, Vec<Type>),
     Unknown(String),
 }
 impl Type {
@@ -48,14 +48,14 @@ impl Type {
             Type::WeakPtr(t) => format!("{}&", t.to_string()),
             Type::Class(name) => name.clone(),
             Type::Enum(name) => name.clone(),
-            Type::Generic(name, generics) => {
+            Type::Generic(t, generics) => {
                 let mut generics_string: String = "".to_string();
                 for generic in generics {
                     generics_string.push_str(&format!("{}, ", generic.to_string()));
                 }
                 generics_string.pop();
                 generics_string.pop();
-                format!("{}<{}>", name, generics_string)
+                format!("{}<{}>", t.to_string(), generics_string)
             }
             Type::Unknown(name) => name.clone(),
         }
@@ -100,6 +100,14 @@ impl Type {
     pub is_virtual: bool,
     pub is_override: bool,
 }
+impl CheckedMethod {
+    pub fn is_static(&self) -> bool {
+        self.parameters.get(0).unwrap().name != "this"
+    }
+    pub fn is_constructor(&self) -> bool {
+        self.name == "create"
+    }
+}
 #[derive(Debug, Clone)] pub enum CheckedExpression {
     Integer8(i8, Span),
     Integer16(i16, Span),
@@ -117,8 +125,10 @@ impl Type {
     Sizeof(Type, Span),
     Identifier(String, Span),
     Null(Span),
+    New(Box<CheckedExpression>, Span),
     MemberAccess(Box<CheckedExpression>, Box<CheckedExpression>, Span),
     StaticMemberAccess(Box<CheckedExpression>, Box<CheckedExpression>, Span),
+    PointerAccess(Box<CheckedExpression>, Box<CheckedExpression>, Span),
     Assignment(Box<CheckedExpression>, Box<CheckedExpression>, Span),
     Call(Box<CheckedExpression>, Vec<CheckedExpression>, Vec<(Type, Span)>, Span),
 }
@@ -141,8 +151,10 @@ impl CheckedExpression {
             CheckedExpression::Sizeof(_, span) => span.clone(),
             CheckedExpression::Identifier(_, span) => span.clone(),
             CheckedExpression::Null(span) => span.clone(),
+            CheckedExpression::New(_, span) => span.clone(),
             CheckedExpression::MemberAccess(_, _, span) => span.clone(),
             CheckedExpression::StaticMemberAccess(_, _, span) => span.clone(),
+            CheckedExpression::PointerAccess(_, _, span) => span.clone(),
             CheckedExpression::Assignment(_, _, span) => span.clone(),
             CheckedExpression::Call(_, _, _, span) => span.clone(),
         }
@@ -385,7 +397,8 @@ impl Typechecker {
     fn typecheck_generic_parameters(&mut self, parameters: Vec<(String, Span)>) -> Result<Vec<(Type, Span)>, OnyxError> {
         let mut checked_parameters: Vec<(Type, Span)> = vec![];
         for parameter in parameters {
-            checked_parameters.push((Type::Generic(parameter.0, vec![]), parameter.1));
+            let t: Type = self.typecheck_type(ParsedType::Name(parameter.0.clone(), parameter.1.clone()))?;
+            checked_parameters.push((t, parameter.1));
         }
         Ok(checked_parameters)
     }
@@ -466,7 +479,7 @@ impl Typechecker {
             ParsedExpression::Call(callee, arguments, generic_parameters, span) => {
                 let checked_callee: CheckedExpression = self.typecheck_expression(*callee)?;
                 let mut checked_arguments: Vec<CheckedExpression> = vec![];
-                let mut checked_generic_parameters: Vec<(Type, Span)> = self.typecheck_generic_parameters(generic_parameters)?;
+                let checked_generic_parameters: Vec<(Type, Span)> = self.typecheck_generic_parameters(generic_parameters)?;
                 for argument in arguments {
                     checked_arguments.push(self.typecheck_expression(argument.1)?);
                 }
@@ -476,6 +489,15 @@ impl Typechecker {
                 let checked_expression: CheckedExpression = self.typecheck_expression(*expression)?;
                 let checked_member: CheckedExpression = self.typecheck_expression(*member)?;
                 Ok(CheckedExpression::StaticMemberAccess(Box::new(checked_expression), Box::new(checked_member), span))
+            }
+            ParsedExpression::PointerAccess(expression, member, span) => {
+                let checked_expression: CheckedExpression = self.typecheck_expression(*expression)?;
+                let checked_member: CheckedExpression = self.typecheck_expression(*member)?;
+                Ok(CheckedExpression::PointerAccess(Box::new(checked_expression), Box::new(checked_member), span))
+            }
+            ParsedExpression::New(expression, span) => {
+                let checked_expression: CheckedExpression = self.typecheck_expression(*expression)?;
+                Ok(CheckedExpression::New(Box::new(checked_expression), span))
             }
             _ => Err(OnyxError::TypeError(format!("unimplemented: {:?}", expression), expression.span()))
         }
@@ -531,11 +553,12 @@ impl Typechecker {
             ParsedType::RawPtr(t, _) => Ok(Type::RawPtr(Box::new(self.typecheck_type(*t)?))),
             ParsedType::WeakPtr(t, _) => Ok(Type::WeakPtr(Box::new(self.typecheck_type(*t)?))),
             ParsedType::GenericType(name, types, _) => {
+                let t: Type = self.typecheck_type(*name)?;
                 let mut checked_types: Vec<Type> = vec![];
                 for type_ in types {
                     checked_types.push(self.typecheck_type(type_)?);
                 }
-                Ok(Type::Generic(name, checked_types))
+                Ok(Type::Generic(Box::new(t), checked_types))
             }
             ParsedType::Empty(_) => Err(OnyxError::TypeErrorWithHint("empty type found".to_string(), type_.span(), "did you forget to specify a type?".to_string(), type_.span())),
         }
